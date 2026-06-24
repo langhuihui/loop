@@ -1,0 +1,13 @@
+{
+  "target": "B",
+  "epoch": 1,
+  "turn": "B",
+  "payload": {
+    "action": "review",
+    "epoch": 1,
+    "branch": "main",
+    "summary": "Implemented feature X",
+    "files": ["src/feature.ts"],
+    "commit": "abc1234"
+  }
+}

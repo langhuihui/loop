@@ -1,0 +1,20 @@
+{
+  "target": "A",
+  "epoch": 1,
+  "turn": "A",
+  "payload": {
+    "action": "continue_dev",
+    "epoch": 1,
+    "verdict": "FIXED",
+    "summary": "Fixed missing dispose() in factory; tests pass",
+    "b_commits": ["def5678"],
+    "files": ["src/factory.ts"],
+    "review_notes": [
+      {
+        "file": "src/factory.ts",
+        "issue": "worker not terminated on destroy",
+        "fixed_by_b": true
+      }
+    ]
+  }
+}

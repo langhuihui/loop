@@ -1,0 +1,5 @@
+.coord-hub.pid
+.coord-hub.log
+.DS_Store
+__pycache__/
+*.pyc
