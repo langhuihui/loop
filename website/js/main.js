@@ -171,6 +171,20 @@ function arrayToLines(arr) {
   return (arr || []).join('\n');
 }
 
+function renderTemplateOptions() {
+  const select = document.getElementById('templateSelect');
+  if (!select) return;
+  const current = select.value || Object.keys(TEMPLATES)[0];
+  select.innerHTML = '';
+  Object.keys(TEMPLATES).forEach((id) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = typeof t === 'function' ? (t(`tpl.${id}`) || id) : id;
+    select.appendChild(opt);
+  });
+  if (TEMPLATES[current]) select.value = current;
+}
+
 function getFormProfile() {
   return {
     template: document.getElementById('templateSelect').value,
@@ -197,6 +211,7 @@ function getFormProfile() {
       constraints: linesToArray(document.getElementById('taskConstraints').value),
     },
     maxEpochs: parseInt(document.getElementById('maxEpochs').value, 10) || 20,
+    lang: window.currentLang || 'en',
   };
 }
 
@@ -243,7 +258,7 @@ Each wake or first run:
 }
 
 function applyTemplate(templateId) {
-  const tpl = TEMPLATES[templateId];
+  const tpl = getLocalizedTemplate(templateId, TEMPLATES);
   if (!tpl) return;
 
   document.getElementById('roleAName').value = tpl.roles.A.name;
@@ -290,6 +305,7 @@ function initSetupUI() {
   const templateSelect = document.getElementById('templateSelect');
   const generateBtn = document.getElementById('generateBtn');
 
+  renderTemplateOptions();
   applyTemplate(templateSelect.value);
 
   const placeholders = ['promptA', 'promptB'];
@@ -320,13 +336,19 @@ function initSetupUI() {
           btn.classList.remove('copied');
         }, 1500);
       } catch {
-        showToast('Copy failed');
+        showToast(typeof t === 'function' ? t('setup.copyFailed') : 'Copy failed');
       }
     });
   });
 }
 
 window.onLanguageChange = () => {
+  renderTemplateOptions();
+  const templateId = document.getElementById('templateSelect')?.value;
+  if (templateId && TEMPLATES[templateId]) {
+    applyTemplate(templateId);
+  }
+
   ['promptA', 'promptB'].forEach((id) => {
     const el = document.getElementById(id);
     if (el?.classList.contains('empty')) {

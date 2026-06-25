@@ -89,6 +89,9 @@ const translations = {
     'arch.hub.layer': 'Hub',
     'arch.hub.title': 'coord-hub.py',
 
+    'setup.copyFailed': 'Copy failed',
+    'field.taskPlaceholder': 'Implement feature X',
+
     'footer.license': 'MIT License',
     'footer.tagline': 'Configure once in the UI, coordinate forever in /loop.',
   },
@@ -183,12 +186,152 @@ const translations = {
     'arch.hub.layer': 'Hub',
     'arch.hub.title': 'coord-hub.py',
 
+    'setup.copyFailed': '复制失败',
+    'field.taskPlaceholder': '实现功能 X',
+
     'footer.license': 'MIT 许可证',
     'footer.tagline': '在 UI 配置一次，在 /loop 中持续协调。',
   },
 };
 
+const templatesZh = {
+  'dev-review': {
+    roles: {
+      A: {
+        name: '开发者',
+        goal: '按小步实现用户任务；每完成一块即交给审查者。',
+        responsibilities: [
+          '从 Hub 读取当前任务与约束',
+          '在 state.branch 上实现下一小块功能',
+          '完成一块后 signal 审查者',
+        ],
+        forbidden: [
+          '不要修 review 反馈 — 那是 B 的工作',
+          '不要 push，除非用户要求',
+        ],
+      },
+      B: {
+        name: '审查者',
+        goal: '审查开发者变更；能修则直接修并提交。',
+        responsibilities: [
+          '审查 A 的 diff 与提交',
+          '直接修复明确问题',
+          '用英文 message 提交，然后 signal A 继续',
+        ],
+        forbidden: [
+          '不要扩展任务范围',
+          '不要 push，除非用户要求',
+        ],
+      },
+    },
+    task: {
+      title: '实现功能 X',
+      constraints: ['不要启动测试服务器', '提交信息用英文'],
+    },
+  },
+  'test-fix': {
+    roles: {
+      A: {
+        name: '测试者',
+        goal: '为给定范围编写并运行测试；将失败报告给修复者。',
+        responsibilities: [
+          '为任务添加或更新测试用例',
+          '运行测试并记录失败',
+          '将失败摘要 signal 给修复者',
+        ],
+        forbidden: ['不要修改生产代码 — 那是 B 的工作'],
+      },
+      B: {
+        name: '修复者',
+        goal: '修复代码直至测试通过；提交修复并交回测试者。',
+        responsibilities: [
+          '阅读 payload 中的测试失败信息',
+          '修复代码直至测试通过',
+          '提交并 signal 测试者进行下一轮',
+        ],
+        forbidden: ['不要削弱测试来凑通过'],
+      },
+    },
+    task: {
+      title: '为模块 Y 添加测试',
+      constraints: ['运行测试需加超时', '不要写不稳定测试'],
+    },
+  },
+  'plan-implement': {
+    roles: {
+      A: {
+        name: '架构师',
+        goal: '为任务产出简洁的技术方案。',
+        responsibilities: [
+          '将需求拆解为实现步骤',
+          '定义接口与文件布局',
+          '将方案 signal 给实现者',
+        ],
+        forbidden: ['不要写实现代码'],
+      },
+      B: {
+        name: '实现者',
+        goal: '按方案实现；提交可工作的代码。',
+        responsibilities: [
+          '遵循 payload 中的架构师方案',
+          '实现并自检',
+          '提交后如需继续则 signal 架构师',
+        ],
+        forbidden: ['不要擅自改架构，除非 signal blocked'],
+      },
+    },
+    task: {
+      title: '设计并实现 API 端点 Z',
+      constraints: ['方案控制在 200 行以内', '匹配现有代码风格'],
+    },
+  },
+  'security-fix': {
+    roles: {
+      A: {
+        name: '审计员',
+        goal: '对变更做安全审查；标记漏洞。',
+        responsibilities: [
+          '扫描 diff 中的安全问题',
+          '评定严重级别',
+          '将发现 signal 给开发者',
+        ],
+        forbidden: ['不要改代码 — 只报告'],
+      },
+      B: {
+        name: '开发者',
+        goal: '修复报告的安全问题并提交。',
+        responsibilities: [
+          '处理审计员发现的问题',
+          '必要时添加回归测试',
+          '提交并 signal 审计员复检',
+        ],
+        forbidden: ['不要忽略严重问题'],
+      },
+    },
+    task: {
+      title: '安全审计近期认证相关变更',
+      constraints: ['遵循 OWASP Top 10', '提交中不要含密钥'],
+    },
+  },
+};
+
 const STORAGE_KEY = 'cursor-ab-coord-lang';
+
+function getLocalizedTemplate(templateId, serverTemplates) {
+  if (window.currentLang === 'zh' && templatesZh[templateId]) {
+    const zh = templatesZh[templateId];
+    const base = serverTemplates[templateId];
+    return {
+      ...base,
+      roles: {
+        A: { ...base.roles.A, ...zh.roles.A },
+        B: { ...base.roles.B, ...zh.roles.B },
+      },
+      task: { ...base.task, ...zh.task },
+    };
+  }
+  return serverTemplates[templateId];
+}
 
 function detectLanguage() {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -211,6 +354,20 @@ function applyLanguage(lang) {
     const key = el.getAttribute('data-i18n');
     const text = dict[key];
     if (text !== undefined) el.innerHTML = text;
+  });
+
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    const text = dict[key];
+    if (text !== undefined) el.placeholder = text;
+  });
+
+  document.querySelectorAll('[data-placeholder-key]').forEach((el) => {
+    if (el.classList.contains('empty')) {
+      const key = el.getAttribute('data-placeholder-key');
+      const text = dict[key];
+      if (text !== undefined) el.textContent = text;
+    }
   });
 
   document.querySelectorAll('.lang-opt').forEach((el) => {

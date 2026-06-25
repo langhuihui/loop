@@ -183,7 +183,7 @@
             <div class="task-grid">
               <div class="config-field task-title">
                 <label class="field-label" for="taskTitle" data-i18n="setup.taskTitle">Title</label>
-                <input id="taskTitle" class="field-input" type="text" placeholder="Implement feature X">
+                <input id="taskTitle" class="field-input" type="text" data-i18n-placeholder="field.taskPlaceholder" placeholder="Implement feature X">
               </div>
               <div class="config-field">
                 <label class="field-label" for="taskBranch" data-i18n="setup.branch">Branch</label>
@@ -218,7 +218,7 @@
                 </div>
                 <button type="button" class="btn-copy" data-target="promptB" data-i18n="setup.copy">Copy</button>
               </div>
-              <pre class="prompt-body" id="promptB" data-i18n-placeholder="setup.placeholderB"></pre>
+              <pre class="prompt-body empty" id="promptB" data-placeholder-key="setup.placeholderB"></pre>
             </div>
 
             <div class="prompt-card">
@@ -229,7 +229,7 @@
                 </div>
                 <button type="button" class="btn-copy" data-target="promptA" data-i18n="setup.copy">Copy</button>
               </div>
-              <pre class="prompt-body" id="promptA" data-i18n-placeholder="setup.placeholderA"></pre>
+              <pre class="prompt-body empty" id="promptA" data-placeholder-key="setup.placeholderA"></pre>
             </div>
           </div>
 
