@@ -1,0 +1,7 @@
+{
+  "name": "cursor-ab-coord",
+  "version": "0.2.0",
+  "description": "Coordinate two Cursor chat sessions via local hub, MCP, and config UI",
+  "author": "cursor-ab-coord",
+  "logo": "assets/logo.svg"
+}

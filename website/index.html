@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Coordinate two Cursor sessions via Skill, MCP, and a local config UI — then copy generated /loop prompts.">
+  <title>cursor-ab-coord</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-a" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-b" aria-hidden="true"></div>
+
+  <header class="header">
+    <a href="#" class="logo">
+      <span class="logo-icon">⟷</span>
+      <span class="logo-text">cursor-ab-coord</span>
+    </a>
+    <nav class="nav">
+      <a href="#flow" data-i18n="nav.flow">Flow</a>
+      <a href="#setup" data-i18n="nav.setup">Setup UI</a>
+      <a href="#architecture" data-i18n="nav.arch">Architecture</a>
+      <a href="https://github.com/langhuihui/loop" class="nav-github" data-i18n="nav.github" target="_blank" rel="noopener">GitHub</a>
+      <button class="lang-toggle" id="langToggle" aria-label="Switch language">
+        <span class="lang-opt" data-lang="en">EN</span>
+        <span class="lang-sep">/</span>
+        <span class="lang-opt" data-lang="zh">中</span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-badge" data-i18n="hero.badge">Skill · MCP · Local UI · MIT</div>
+      <h1 class="hero-title">
+        <span data-i18n="hero.title1">One skill to start,</span><br>
+        <span class="gradient-text" data-i18n="hero.title2">two sessions in sync</span>
+      </h1>
+      <p class="hero-desc" data-i18n="hero.desc">
+        Run <code>coord-setup</code> in Cursor — MCP starts the hub, you configure roles and tasks in a local UI, then copy generated <code>/loop</code> prompts into Session A and B.
+      </p>
+      <div class="hero-actions">
+        <a href="#setup" class="btn btn-primary" data-i18n="hero.cta">Try the setup UI</a>
+        <a href="#flow" class="btn btn-ghost" data-i18n="hero.learn">See the flow</a>
+      </div>
+    </section>
+
+    <section class="flow-section" id="flow">
+      <h2 class="section-title" data-i18n="flow.title">End-to-end flow</h2>
+      <p class="section-desc" data-i18n="flow.desc">
+        The hub still handles cross-session wake via long-poll. Skill and UI handle everything before the loop starts.
+      </p>
+
+      <ol class="pipeline-steps">
+        <li class="pipeline-step">
+          <div class="step-icon">1</div>
+          <div class="step-body">
+            <h3 data-i18n="flow.s1.title">Trigger <code>coord-setup</code> skill</h3>
+            <p data-i18n="flow.s1.desc">In any Cursor chat, ask the agent to set up A/B coordination.</p>
+          </div>
+        </li>
+        <li class="pipeline-step">
+          <div class="step-icon">2</div>
+          <div class="step-body">
+            <h3 data-i18n="flow.s2.title">MCP starts the hub</h3>
+            <p data-i18n="flow.s2.desc">Skill calls MCP <code>coord_start</code> — hub listens on <code>127.0.0.1:9900</code>.</p>
+          </div>
+        </li>
+        <li class="pipeline-step">
+          <div class="step-icon">3</div>
+          <div class="step-body">
+            <h3 data-i18n="flow.s3.title">Open the config UI</h3>
+            <p data-i18n="flow.s3.desc">Skill returns a link. Pick a template, edit A/B goals, set task and branch.</p>
+          </div>
+        </li>
+        <li class="pipeline-step">
+          <div class="step-icon">4</div>
+          <div class="step-body">
+            <h3 data-i18n="flow.s4.title">Generate &amp; copy prompts</h3>
+            <p data-i18n="flow.s4.desc">UI writes profile to hub, renders short <code>/loop dynamic</code> prompts for each role.</p>
+          </div>
+        </li>
+        <li class="pipeline-step">
+          <div class="step-icon">5</div>
+          <div class="step-body">
+            <h3 data-i18n="flow.s5.title">Paste into Session B, then A</h3>
+            <p data-i18n="flow.s5.desc">Start B first, then A. Watchers wake each session when the other signals.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="flow-diagram">
+        <div class="flow-lane">
+          <div class="lane-label" data-i18n="flow.lane.user">You</div>
+          <div class="lane-node skill-node" data-i18n="flow.node.skill">coord-setup skill</div>
+          <span class="lane-arrow">↓</span>
+          <div class="lane-node ui-node" data-i18n="flow.node.ui">Config UI</div>
+          <span class="lane-arrow">↓</span>
+          <div class="lane-node prompt-node" data-i18n="flow.node.prompts">Copy prompts</div>
+        </div>
+        <div class="flow-lane flow-lane-mid">
+          <div class="lane-label" data-i18n="flow.lane.runtime">Runtime</div>
+          <div class="lane-node mcp-node">MCP</div>
+          <span class="lane-arrow">↔</span>
+          <div class="lane-node hub-node">
+            <span class="hub-port">:9900</span>
+            <span data-i18n="flow.hub">Coord Hub</span>
+          </div>
+        </div>
+        <div class="flow-lane">
+          <div class="lane-label" data-i18n="flow.lane.sessions">Sessions</div>
+          <div class="lane-node session-a" data-i18n="flow.node.a">Session A</div>
+          <span class="lane-arrow bidir">⟷</span>
+          <div class="lane-node session-b" data-i18n="flow.node.b">Session B</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="setup-section" id="setup">
+      <div class="setup-header">
+        <div>
+          <h2 class="section-title" data-i18n="setup.title">Setup UI preview</h2>
+          <p class="section-desc setup-desc" data-i18n="setup.desc">
+            Interactive mock of the hub config page. In production this lives at <code>GET /ui</code> on the running hub.
+          </p>
+        </div>
+        <div class="hub-status" id="hubStatus">
+          <span class="status-dot offline"></span>
+          <span data-i18n="setup.mock">Preview mode — not connected to hub</span>
+        </div>
+      </div>
+
+      <div class="setup-stack">
+        <div class="setup-panel">
+          <div class="panel-block config-top">
+            <div class="config-field">
+              <label class="field-label" for="templateSelect" data-i18n="setup.template">Workflow template</label>
+              <select id="templateSelect" class="field-input">
+                <option value="dev-review" data-i18n="tpl.dev-review">Dev + Review (default)</option>
+                <option value="test-fix" data-i18n="tpl.test-fix">Test + Fix</option>
+                <option value="plan-implement" data-i18n="tpl.plan-implement">Plan + Implement</option>
+                <option value="security-fix" data-i18n="tpl.security-fix">Security + Fix</option>
+              </select>
+            </div>
+            <div class="config-field">
+              <label class="field-label" for="hubUrl" data-i18n="setup.hubUrl">Hub URL</label>
+              <input id="hubUrl" class="field-input" type="text" value="http://127.0.0.1:9900">
+            </div>
+          </div>
+
+          <div class="panel-block roles-grid">
+            <div class="role-card">
+              <h3 class="panel-title role-a-title"><span class="prompt-role role-a-badge">A</span> <span data-i18n="setup.roleA">Role A</span></h3>
+              <label class="field-label" for="roleAName" data-i18n="setup.name">Name</label>
+              <input id="roleAName" class="field-input" type="text">
+              <label class="field-label" for="roleAGoal" data-i18n="setup.goal">Goal</label>
+              <textarea id="roleAGoal" class="field-input field-textarea" rows="2"></textarea>
+              <label class="field-label" for="roleAResp" data-i18n="setup.responsibilities">Responsibilities (one per line)</label>
+              <textarea id="roleAResp" class="field-input field-textarea" rows="4"></textarea>
+              <label class="field-label" for="roleAForbidden" data-i18n="setup.forbidden">Forbidden (one per line)</label>
+              <textarea id="roleAForbidden" class="field-input field-textarea" rows="2"></textarea>
+            </div>
+
+            <div class="role-card">
+              <h3 class="panel-title role-b-title"><span class="prompt-role role-b-badge">B</span> <span data-i18n="setup.roleB">Role B</span></h3>
+              <label class="field-label" for="roleBName" data-i18n="setup.name">Name</label>
+              <input id="roleBName" class="field-input" type="text">
+              <label class="field-label" for="roleBGoal" data-i18n="setup.goal">Goal</label>
+              <textarea id="roleBGoal" class="field-input field-textarea" rows="2"></textarea>
+              <label class="field-label" for="roleBResp" data-i18n="setup.responsibilities">Responsibilities (one per line)</label>
+              <textarea id="roleBResp" class="field-input field-textarea" rows="4"></textarea>
+              <label class="field-label" for="roleBForbidden" data-i18n="setup.forbidden">Forbidden (one per line)</label>
+              <textarea id="roleBForbidden" class="field-input field-textarea" rows="2"></textarea>
+            </div>
+          </div>
+
+          <div class="panel-block">
+            <h3 class="panel-title" data-i18n="setup.task">Runtime task</h3>
+            <div class="task-grid">
+              <div class="config-field task-title">
+                <label class="field-label" for="taskTitle" data-i18n="setup.taskTitle">Title</label>
+                <input id="taskTitle" class="field-input" type="text" placeholder="Implement feature X">
+              </div>
+              <div class="config-field">
+                <label class="field-label" for="taskBranch" data-i18n="setup.branch">Branch</label>
+                <input id="taskBranch" class="field-input" type="text" value="main">
+              </div>
+              <div class="config-field">
+                <label class="field-label" for="maxEpochs" data-i18n="setup.maxEpochs">Max epochs</label>
+                <input id="maxEpochs" class="field-input" type="number" min="1" max="100" value="20">
+              </div>
+            </div>
+            <label class="field-label" for="taskConstraints" data-i18n="setup.constraints">Constraints (one per line)</label>
+            <textarea id="taskConstraints" class="field-input field-textarea" rows="2"></textarea>
+          </div>
+
+          <div class="panel-block panel-actions">
+            <p class="setup-hint" data-i18n="setup.hint">
+              Start Session <strong>B</strong> first, paste its prompt, then Session <strong>A</strong>.
+            </p>
+            <button type="button" class="btn btn-primary" id="generateBtn" data-i18n="setup.generate">
+              Generate prompts
+            </button>
+          </div>
+        </div>
+
+        <div class="prompts-panel">
+          <div class="prompts-grid">
+            <div class="prompt-card">
+              <div class="prompt-header">
+                <div>
+                  <span class="prompt-role role-b-badge">B</span>
+                  <span class="prompt-role-name" id="promptBName">reviewer</span>
+                </div>
+                <button type="button" class="btn-copy" data-target="promptB" data-i18n="setup.copy">Copy</button>
+              </div>
+              <pre class="prompt-body" id="promptB" data-i18n-placeholder="setup.placeholderB"></pre>
+            </div>
+
+            <div class="prompt-card">
+              <div class="prompt-header">
+                <div>
+                  <span class="prompt-role role-a-badge">A</span>
+                  <span class="prompt-role-name" id="promptAName">builder</span>
+                </div>
+                <button type="button" class="btn-copy" data-target="promptA" data-i18n="setup.copy">Copy</button>
+              </div>
+              <pre class="prompt-body" id="promptA" data-i18n-placeholder="setup.placeholderA"></pre>
+            </div>
+          </div>
+
+          <details class="profile-preview">
+            <summary data-i18n="setup.profileJson">Profile JSON (POST /profile)</summary>
+            <pre class="profile-json" id="profileJson"></pre>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🧩</div>
+        <h3 data-i18n="feat1.title">Custom roles</h3>
+        <p data-i18n="feat1.desc">Profile + workflow template + runtime task — dev/review is just one preset.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3 data-i18n="feat2.title">Skill entry</h3>
+        <p data-i18n="feat2.desc"><code>coord-setup</code> starts MCP, opens UI, guides you through config.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📋</div>
+        <h3 data-i18n="feat3.title">Short prompts</h3>
+        <p data-i18n="feat3.desc">Agents read <code>/profile</code> and <code>/state</code> — rules live on the hub, not in chat.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔁</div>
+        <h3 data-i18n="feat4.title">/loop wake</h3>
+        <p data-i18n="feat4.desc">Background <code>curl /wait/&lt;role&gt;</code> still bridges sessions after setup.</p>
+      </div>
+    </section>
+
+    <section class="arch-section" id="architecture">
+      <h2 class="section-title" data-i18n="arch.title">Architecture</h2>
+      <p class="section-desc" data-i18n="arch.desc">
+        Each layer has a single job. Skill guides, MCP operates, UI configures, hub coordinates, sessions execute.
+      </p>
+
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-layer" data-i18n="arch.skill.layer">Skill</div>
+          <h3 data-i18n="arch.skill.title">coord-setup</h3>
+          <ul>
+            <li data-i18n="arch.skill.1">Call MCP to start/stop hub</li>
+            <li data-i18n="arch.skill.2">Return UI link to user</li>
+            <li data-i18n="arch.skill.3">Explain paste order (B then A)</li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-layer mcp" data-i18n="arch.mcp.layer">MCP</div>
+          <h3 data-i18n="arch.mcp.title">coord_* tools</h3>
+          <ul>
+            <li><code>coord_start</code> · <code>coord_stop</code></li>
+            <li><code>coord_state</code> · <code>coord_reset</code></li>
+            <li><code>coord_signal</code> · <code>coord_profile</code></li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-layer ui" data-i18n="arch.ui.layer">UI</div>
+          <h3 data-i18n="arch.ui.title">GET /ui</h3>
+          <ul>
+            <li data-i18n="arch.ui.1">Template picker + role editor</li>
+            <li data-i18n="arch.ui.2">Task, branch, constraints</li>
+            <li data-i18n="arch.ui.3">Generate → GET /prompt/A|B</li>
+          </ul>
+        </div>
+        <div class="arch-card">
+          <div class="arch-layer hub" data-i18n="arch.hub.layer">Hub</div>
+          <h3 data-i18n="arch.hub.title">coord-hub.py</h3>
+          <ul>
+            <li><code>/wait/A</code> · <code>/wait/B</code></li>
+            <li><code>/signal</code> · <code>/state</code></li>
+            <li><code>/profile</code> · <code>/reset</code></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p data-i18n="footer.license">MIT License</p>
+    <p class="footer-sub" data-i18n="footer.tagline">Configure once in the UI, coordinate forever in /loop.</p>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -16,6 +16,11 @@ if [ -f "$PID_FILE" ]; then
   rm -f "$PID_FILE"
 fi
 
+if curl -sf --max-time 3 "http://${HOST}:${PORT}/state" >/dev/null 2>&1; then
+  echo "coord-hub already running on http://${HOST}:${PORT} (pid file missing or stale)"
+  exit 0
+fi
+
 nohup python3 "$ROOT/coord-hub.py" --host "$HOST" --port "$PORT" >>"$LOG_FILE" 2>&1 &
 echo $! >"$PID_FILE"
 sleep 0.5

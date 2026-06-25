@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cursor-ab-coord": {
+      "command": "python3",
+      "args": ["mcp/server.py"]
+    }
+  }
+}

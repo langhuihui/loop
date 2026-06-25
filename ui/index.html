@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cursor-ab-coord setup</title>
+  <link rel="stylesheet" href="/ui/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <h1>cursor-ab-coord</h1>
+    <div class="header-right">
+      <div class="status" id="hubStatus">
+        <span class="status-dot"></span>
+        <span id="statusText" data-i18n="status.connecting">Connecting…</span>
+      </div>
+      <button class="lang-toggle" id="langToggle" aria-label="Switch language">
+        <span class="lang-opt" data-lang="en">EN</span>
+        <span class="lang-sep">/</span>
+        <span class="lang-opt" data-lang="zh">中</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2 data-i18n="config.title">Configuration</h2>
+        <button type="button" class="btn-primary" id="generateBtn" data-i18n="config.generate">Generate &amp; apply</button>
+      </div>
+      <p class="error" id="formError" hidden></p>
+
+      <div class="config-top">
+        <div class="field">
+          <label for="templateSelect" data-i18n="config.template">Workflow template</label>
+          <select id="templateSelect"></select>
+        </div>
+      </div>
+
+      <div class="roles-grid">
+        <div class="role-card">
+          <h3 class="role-a"><span class="badge badge-a">A</span> <span data-i18n="role.a">Role A</span></h3>
+          <label for="roleAName" data-i18n="field.name">Name</label>
+          <input id="roleAName" type="text">
+          <label for="roleAGoal" data-i18n="field.goal">Goal</label>
+          <textarea id="roleAGoal" rows="2"></textarea>
+          <label for="roleAResp" data-i18n="field.responsibilities">Responsibilities (one per line)</label>
+          <textarea id="roleAResp" rows="4"></textarea>
+          <label for="roleAForbidden" data-i18n="field.forbidden">Forbidden (one per line)</label>
+          <textarea id="roleAForbidden" rows="2"></textarea>
+        </div>
+
+        <div class="role-card">
+          <h3 class="role-b"><span class="badge badge-b">B</span> <span data-i18n="role.b">Role B</span></h3>
+          <label for="roleBName" data-i18n="field.name">Name</label>
+          <input id="roleBName" type="text">
+          <label for="roleBGoal" data-i18n="field.goal">Goal</label>
+          <textarea id="roleBGoal" rows="2"></textarea>
+          <label for="roleBResp" data-i18n="field.responsibilities">Responsibilities (one per line)</label>
+          <textarea id="roleBResp" rows="4"></textarea>
+          <label for="roleBForbidden" data-i18n="field.forbidden">Forbidden (one per line)</label>
+          <textarea id="roleBForbidden" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="task-block">
+        <h3 data-i18n="task.title">Runtime task</h3>
+        <div class="task-grid">
+          <div class="field field-wide">
+            <label for="taskTitle" data-i18n="field.taskTitle">Title</label>
+            <input id="taskTitle" type="text" data-i18n-placeholder="field.taskPlaceholder" placeholder="Implement feature X">
+          </div>
+          <div class="field">
+            <label for="taskBranch" data-i18n="field.branch">Branch</label>
+            <input id="taskBranch" type="text" value="main">
+          </div>
+          <div class="field">
+            <label for="maxEpochs" data-i18n="field.maxEpochs">Max epochs</label>
+            <input id="maxEpochs" type="number" min="1" max="100" value="20">
+          </div>
+        </div>
+        <label for="taskConstraints" data-i18n="field.constraints">Constraints (one per line)</label>
+        <textarea id="taskConstraints" rows="2"></textarea>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 data-i18n="prompts.title">Session prompts</h2>
+        <p class="hint" data-i18n="prompts.hint">Start <strong>Session B</strong> first, then <strong>Session A</strong>.</p>
+      </div>
+
+      <div class="prompts-grid">
+        <div class="prompt-card">
+          <div class="prompt-header">
+            <span><span class="badge badge-b">B</span> <span id="promptBName">—</span></span>
+            <button type="button" class="btn-copy" data-target="promptB" data-i18n="prompts.copy">Copy</button>
+          </div>
+          <pre id="promptB" class="prompt-body empty" data-placeholder-key="prompts.placeholder">Apply configuration to generate prompts…</pre>
+        </div>
+
+        <div class="prompt-card">
+          <div class="prompt-header">
+            <span><span class="badge badge-a">A</span> <span id="promptAName">—</span></span>
+            <button type="button" class="btn-copy" data-target="promptA" data-i18n="prompts.copy">Copy</button>
+          </div>
+          <pre id="promptA" class="prompt-body empty" data-placeholder-key="prompts.placeholder">Apply configuration to generate prompts…</pre>
+        </div>
+      </div>
+
+      <details>
+        <summary data-i18n="prompts.hubState">Hub state</summary>
+        <pre id="stateJson" class="json-preview">{}</pre>
+      </details>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/ui/js/i18n.js"></script>
+  <script src="/ui/js/main.js"></script>
+</body>
+</html>

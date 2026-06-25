@@ -1,0 +1,158 @@
+{
+  "dev-review": {
+    "roles": {
+      "A": {
+        "name": "builder",
+        "goal": "Implement the user task in small slices; hand off to reviewer when each slice is done.",
+        "responsibilities": [
+          "Read current task and constraints from hub",
+          "Implement the next small slice on state.branch",
+          "Signal reviewer when a slice is complete"
+        ],
+        "forbidden": [
+          "Do not fix review feedback — that is B's job",
+          "Do not push unless user asks"
+        ],
+        "wakeSentinel": "AGENT_LOOP_WAKE_A"
+      },
+      "B": {
+        "name": "reviewer",
+        "goal": "Review builder changes; fix issues directly and commit when appropriate.",
+        "responsibilities": [
+          "Review A's diff and commits",
+          "Fix clear issues yourself",
+          "Commit with English message, then signal A to continue"
+        ],
+        "forbidden": [
+          "Do not expand scope beyond the task",
+          "Do not push unless user asks"
+        ],
+        "wakeSentinel": "AGENT_LOOP_WAKE_B"
+      }
+    },
+    "workflow": {
+      "initialTurn": "A",
+      "transitions": [
+        { "from": "A", "to": "B", "action": "review" },
+        { "from": "B", "to": "A", "action": "continue_dev" },
+        { "from": "B", "to": "A", "action": "blocked", "stop": true }
+      ]
+    },
+    "task": {
+      "title": "Implement feature X",
+      "constraints": ["Do not start test servers", "Commit messages in English"]
+    }
+  },
+  "test-fix": {
+    "roles": {
+      "A": {
+        "name": "tester",
+        "goal": "Write and run tests for the given scope; report failures to fixer.",
+        "responsibilities": [
+          "Add or update test cases for the task",
+          "Run tests and capture failures",
+          "Signal fixer with failure summary"
+        ],
+        "forbidden": ["Do not fix production code — that is B's job"],
+        "wakeSentinel": "AGENT_LOOP_WAKE_A"
+      },
+      "B": {
+        "name": "fixer",
+        "goal": "Fix code until tests pass; commit fixes and hand back to tester.",
+        "responsibilities": [
+          "Read test failures from payload",
+          "Fix code until tests pass",
+          "Commit and signal tester for next round"
+        ],
+        "forbidden": ["Do not weaken tests to make them pass"],
+        "wakeSentinel": "AGENT_LOOP_WAKE_B"
+      }
+    },
+    "workflow": {
+      "initialTurn": "A",
+      "transitions": [
+        { "from": "A", "to": "B", "action": "review" },
+        { "from": "B", "to": "A", "action": "continue_dev" }
+      ]
+    },
+    "task": {
+      "title": "Add tests for module Y",
+      "constraints": ["Run tests with timeout", "No flaky tests"]
+    }
+  },
+  "plan-implement": {
+    "roles": {
+      "A": {
+        "name": "architect",
+        "goal": "Produce a concise technical plan for the task.",
+        "responsibilities": [
+          "Break down requirements into implementation steps",
+          "Define interfaces and file layout",
+          "Signal implementer with plan"
+        ],
+        "forbidden": ["Do not write implementation code"],
+        "wakeSentinel": "AGENT_LOOP_WAKE_A"
+      },
+      "B": {
+        "name": "implementer",
+        "goal": "Implement according to the plan; commit working code.",
+        "responsibilities": [
+          "Follow architect plan from payload",
+          "Implement and self-check",
+          "Commit and signal architect for next slice if needed"
+        ],
+        "forbidden": ["Do not change architecture without signaling blocked"],
+        "wakeSentinel": "AGENT_LOOP_WAKE_B"
+      }
+    },
+    "workflow": {
+      "initialTurn": "A",
+      "transitions": [
+        { "from": "A", "to": "B", "action": "review" },
+        { "from": "B", "to": "A", "action": "continue_dev" }
+      ]
+    },
+    "task": {
+      "title": "Design and build API endpoint Z",
+      "constraints": ["Keep plan under 200 lines", "Match existing code style"]
+    }
+  },
+  "security-fix": {
+    "roles": {
+      "A": {
+        "name": "auditor",
+        "goal": "Security-review changes; flag vulnerabilities.",
+        "responsibilities": [
+          "Scan diff for security issues",
+          "Classify severity",
+          "Signal developer with findings"
+        ],
+        "forbidden": ["Do not fix code — report only"],
+        "wakeSentinel": "AGENT_LOOP_WAKE_A"
+      },
+      "B": {
+        "name": "developer",
+        "goal": "Fix reported security issues and commit.",
+        "responsibilities": [
+          "Address auditor findings",
+          "Add regression tests where needed",
+          "Commit and signal auditor for re-check"
+        ],
+        "forbidden": ["Do not ignore critical findings"],
+        "wakeSentinel": "AGENT_LOOP_WAKE_B"
+      }
+    },
+    "workflow": {
+      "initialTurn": "A",
+      "transitions": [
+        { "from": "A", "to": "B", "action": "review" },
+        { "from": "B", "to": "A", "action": "continue_dev" },
+        { "from": "B", "to": "A", "action": "blocked", "stop": true }
+      ]
+    },
+    "task": {
+      "title": "Security audit recent auth changes",
+      "constraints": ["Follow OWASP top 10", "No secrets in commits"]
+    }
+  }
+}

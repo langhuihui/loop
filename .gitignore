@@ -1,5 +1,8 @@
 .coord-hub.pid
 .coord-hub.log
+.coord-state.json
+.coord-profile.json
+.coord-history.json
 .DS_Store
 __pycache__/
 *.pyc
