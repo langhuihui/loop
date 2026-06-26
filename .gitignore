@@ -8,6 +8,8 @@
 .coord-history.json.tmp
 .coord-lessons.json
 .coord-lessons.json.tmp
+.coord-endpoint.json
+.coord-endpoint.json.tmp
 .DS_Store
 __pycache__/
 *.pyc

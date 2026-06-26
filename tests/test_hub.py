@@ -3,11 +3,14 @@ from __future__ import annotations
 import io
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 from lib.version import VERSION
 
@@ -47,6 +50,39 @@ class HubTests(unittest.TestCase):
         hub = load_hub_module()
 
         self.assertEqual(hub.VERSION, VERSION)
+
+    def test_coord_data_dir_controls_persisted_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"COORD_DATA_DIR": tmp}):
+                hub = load_hub_module()
+
+            self.assertEqual(hub.DATA_DIR, Path(tmp))
+            self.assertEqual(hub.STATE_PATH, Path(tmp) / ".coord-state.json")
+            self.assertEqual(hub.ENDPOINT_PATH, Path(tmp) / ".coord-endpoint.json")
+
+    def test_parse_port_accepts_auto_and_integers(self) -> None:
+        hub = load_hub_module()
+
+        self.assertEqual(hub.parse_port("auto"), 0)
+        self.assertEqual(hub.parse_port("0"), 0)
+        self.assertEqual(hub.parse_port("9931"), 9931)
+        for bad in ("nope", "-1", "70000"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(Exception):
+                    hub.parse_port(bad)
+
+    def test_write_and_remove_endpoint_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"COORD_DATA_DIR": tmp}):
+                hub = load_hub_module()
+
+            hub.write_endpoint("127.0.0.1", 9931)
+            data = json.loads(hub.ENDPOINT_PATH.read_text(encoding="utf-8"))
+            self.assertEqual(data["port"], 9931)
+            self.assertEqual(data["url"], "http://127.0.0.1:9931")
+
+            hub.remove_endpoint()
+            self.assertFalse(hub.ENDPOINT_PATH.exists())
 
     def test_profile_validation_result_reports_errors(self) -> None:
         hub = load_hub_module()

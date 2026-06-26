@@ -2,7 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HUB_URL="${COORD_HUB_URL:-http://127.0.0.1:9900}"
+DATA_DIR="${COORD_DATA_DIR:-$ROOT}"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/_hub-url.sh"
+HUB_URL="$(coord_resolve_hub_url "$ROOT")"
 TIMEOUT="${COORD_DOCTOR_TIMEOUT:-3}"
 FAILS=0
 WARNS=0
@@ -46,6 +49,7 @@ cd "$ROOT"
 
 echo "Coord doctor"
 echo "root: $ROOT"
+echo "data: $DATA_DIR"
 echo "hub:  $HUB_URL"
 echo
 

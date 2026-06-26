@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HUB_URL="${COORD_HUB_URL:-http://127.0.0.1:9900}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/_hub-url.sh"
+HUB_URL="$(coord_resolve_hub_url "$ROOT")"
 TIMEOUT="${COORD_PROMPT_TIMEOUT:-5}"
 ROLE="${1:-all}"
 ROLE_UPPER="$(printf '%s' "$ROLE" | tr '[:lower:]' '[:upper:]')"

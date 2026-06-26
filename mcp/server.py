@@ -19,9 +19,69 @@ from lib.profile import build_profile, validate_profile  # noqa: E402
 from lib.version import VERSION  # noqa: E402
 
 SERVER_VERSION = VERSION
-HUB_URL = os.environ.get("COORD_HUB_URL", "http://127.0.0.1:9900").rstrip("/")
 HUB_HOST = os.environ.get("COORD_HUB_HOST", "127.0.0.1")
 HUB_PORT = os.environ.get("COORD_HUB_PORT", "9900")
+AUTO_PORT = HUB_PORT == "auto"
+_url_port = "9900" if AUTO_PORT else HUB_PORT
+HUB_URL = os.environ.get("COORD_HUB_URL", f"http://{HUB_HOST}:{_url_port}").rstrip("/")
+
+
+def default_data_dir() -> str:
+    configured = os.environ.get("COORD_DATA_DIR")
+    if configured:
+        return configured
+    if os.environ.get("CURSOR_PLUGIN_ROOT"):
+        return str(Path.home() / ".cursor-ab-coord")
+    return str(ROOT)
+
+
+DATA_DIR = default_data_dir()
+ENDPOINT_PATH = Path(DATA_DIR) / ".coord-endpoint.json"
+
+
+def read_endpoint() -> dict[str, Any] | None:
+    """Read the running hub's endpoint file, if present."""
+    try:
+        data = json.loads(ENDPOINT_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    if isinstance(data, dict) and data.get("url"):
+        return data
+    return None
+
+
+def active_hub_url() -> str:
+    """Resolve the hub URL, preferring an explicit override, then discovery."""
+    override = os.environ.get("COORD_HUB_URL")
+    if override:
+        return override.rstrip("/")
+    endpoint = read_endpoint()
+    if endpoint:
+        return str(endpoint["url"]).rstrip("/")
+    return HUB_URL
+
+
+def active_ui_url() -> str:
+    return f"{active_hub_url()}/ui/"
+
+
+def configured_ui_url() -> str:
+    """UI URL from static config, used for hub-independent reporting."""
+    return f"{HUB_URL}/ui/"
+
+
+def coord_env() -> dict[str, str]:
+    env = {
+        **os.environ,
+        "COORD_HUB_HOST": HUB_HOST,
+        "COORD_HUB_PORT": HUB_PORT,
+        "COORD_DATA_DIR": DATA_DIR,
+    }
+    # With an OS-assigned port, let child scripts discover the real URL from the
+    # endpoint file instead of pinning a misleading COORD_HUB_URL.
+    if os.environ.get("COORD_HUB_URL") or not AUTO_PORT:
+        env["COORD_HUB_URL"] = HUB_URL
+    return env
 
 TOOLS: list[dict[str, Any]] = [
     {
@@ -299,7 +359,8 @@ TOOLS: list[dict[str, Any]] = [
 
 
 def hub_request(method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
-    url = f"{HUB_URL}{path}"
+    base = active_hub_url()
+    url = f"{base}{path}"
     data = None
     headers = {"Accept": "application/json"}
     if body is not None:
@@ -321,7 +382,7 @@ def hub_request(method: str, path: str, body: dict[str, Any] | None = None) -> d
             raise RuntimeError(f"{err.get('error', 'request failed')}: {detail}") from e
         raise RuntimeError(err.get("error", raw or str(e))) from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"hub unreachable at {HUB_URL}: {e}") from e
+        raise RuntimeError(f"hub unreachable at {base}: {e}") from e
 
 
 def tool_result_text(obj: Any) -> dict[str, Any]:
@@ -337,7 +398,7 @@ def start_hub() -> dict[str, Any]:
         capture_output=True,
         text=True,
         timeout=15,
-        env={**os.environ, "COORD_HUB_HOST": HUB_HOST, "COORD_HUB_PORT": HUB_PORT},
+        env=coord_env(),
     )
     out = (proc.stdout or "") + (proc.stderr or "")
     if proc.returncode != 0:
@@ -345,7 +406,9 @@ def start_hub() -> dict[str, Any]:
     return {
         "ok": True,
         "message": out.strip(),
-        "ui_url": f"http://{HUB_HOST}:{HUB_PORT}/ui/",
+        "ui_url": active_ui_url(),
+        "hub_url": active_hub_url(),
+        "data_dir": DATA_DIR,
         "state": hub_request("GET", "/state"),
     }
 
@@ -360,7 +423,9 @@ def doctor_result(proc: subprocess.CompletedProcess[str]) -> dict[str, Any]:
 
 def run_doctor() -> dict[str, Any]:
     script = ROOT / "scripts" / "doctor.sh"
-    proc = subprocess.run([str(script)], cwd=ROOT, capture_output=True, text=True, timeout=15)
+    proc = subprocess.run(
+        [str(script)], cwd=ROOT, capture_output=True, text=True, timeout=15, env=coord_env()
+    )
     return doctor_result(proc)
 
 
@@ -451,7 +516,7 @@ def build_quick_setup_result(
     task = profile.get("task", {})
     return {
         "ok": True,
-        "ui_url": start.get("ui_url", f"http://{HUB_HOST}:{HUB_PORT}/ui/"),
+        "ui_url": start.get("ui_url", active_ui_url()),
         "paste_order": ["B", "A"],
         "prompts": setup.get("prompts", {}),
         "profile_summary": {
@@ -518,7 +583,8 @@ def run_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             {
                 "name": "cursor-ab-coord",
                 "version": SERVER_VERSION,
-                "ui_url": f"http://{HUB_HOST}:{HUB_PORT}/ui/",
+                "ui_url": configured_ui_url(),
+                "data_dir": DATA_DIR,
             }
         )
 
@@ -539,7 +605,9 @@ def run_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
     if name == "coord_stop":
         script = ROOT / "scripts" / "stop.sh"
-        proc = subprocess.run([str(script)], cwd=ROOT, capture_output=True, text=True, timeout=10)
+        proc = subprocess.run(
+            [str(script)], cwd=ROOT, capture_output=True, text=True, timeout=10, env=coord_env()
+        )
         out = (proc.stdout or "") + (proc.stderr or "")
         return tool_result_text({"ok": proc.returncode == 0, "message": out.strip()})
 
@@ -552,7 +620,9 @@ def run_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if "hub unreachable" not in str(e):
                 raise
             script = ROOT / "scripts" / "clear-state.sh"
-            proc = subprocess.run([str(script)], cwd=ROOT, capture_output=True, text=True, timeout=10)
+            proc = subprocess.run(
+                [str(script)], cwd=ROOT, capture_output=True, text=True, timeout=10, env=coord_env()
+            )
             out = (proc.stdout or "") + (proc.stderr or "")
             return tool_result_text(
                 {
@@ -608,7 +678,7 @@ def run_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("action must be list or add")
 
     if name == "coord_setup_url":
-        return tool_result_text({"ui_url": f"http://{HUB_HOST}:{HUB_PORT}/ui/"})
+        return tool_result_text({"ui_url": active_ui_url()})
 
     if name == "coord_reset":
         return tool_result_text(hub_request("POST", "/reset", build_reset_body(arguments or {})))

@@ -9,7 +9,7 @@ description: >-
 
 # coord-setup
 
-Set up two-session coordination for this repo.
+Set up two-session coordination for the current workspace.
 
 ## Instructions
 

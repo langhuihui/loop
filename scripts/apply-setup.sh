@@ -2,7 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HUB_URL="${COORD_HUB_URL:-http://127.0.0.1:9900}"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/_hub-url.sh"
+HUB_URL="$(coord_resolve_hub_url "$ROOT")"
 TIMEOUT="${COORD_APPLY_TIMEOUT:-5}"
 DRY_RUN=false
 TMP_PROFILE=""

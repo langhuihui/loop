@@ -1,7 +1,17 @@
 {
   "name": "cursor-ab-coord",
-  "version": "0.4.0",
+  "displayName": "A/B Session Coordination",
+  "version": "0.5.0",
   "description": "Coordinate two Cursor chat sessions via local hub, MCP, and config UI",
-  "author": "cursor-ab-coord",
+  "author": {
+    "name": "cursor-ab-coord"
+  },
+  "keywords": [
+    "coordination",
+    "loop",
+    "multi-session",
+    "mcp"
+  ],
+  "license": "MIT",
   "logo": "assets/logo.svg"
 }

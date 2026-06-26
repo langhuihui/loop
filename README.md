@@ -31,7 +31,7 @@ Run MCP from the **repo root** (or install as a Cursor plugin — see below).
 
 ### 2. Run `coord-setup`
 
-In any Cursor chat in this repo, ask:
+In any Cursor chat with this project/plugin enabled, ask:
 
 > Set up A/B coordination
 
@@ -58,6 +58,81 @@ The agent uses the skill to:
 Prompts are short: agents re-anchor with `GET /snapshot` from the hub at runtime.
 
 The hub persists the latest state/profile/history/lessons in local hidden files (`.coord-state.json`, `.coord-profile.json`, `.coord-history.json`, `.coord-lessons.json`) so the UI can restore your setup after a restart.
+
+## Cursor plugin install
+
+This repository is laid out as a single Cursor plugin: `.cursor-plugin/plugin.json`
+declares the plugin, `mcp.json` declares the MCP server, and
+`skills/coord-setup/SKILL.md` provides the setup skill. The plugin also includes
+`commands/coord-setup.md` as a slash-command entry point.
+
+For local plugin testing, symlink the repo into Cursor's local plugins folder,
+then reload Cursor:
+
+```bash
+mkdir -p ~/.cursor/plugins/local
+ln -s "$(pwd)" ~/.cursor/plugins/local/cursor-ab-coord
+```
+
+After reload, enable the plugin from Cursor's Plugins UI and ask for
+`coord-setup` in any workspace. When Cursor loads this as a plugin, the MCP
+server keeps hub state under `~/.cursor-ab-coord` by default instead of writing
+runtime files into Cursor's plugin cache. Override with `COORD_DATA_DIR` if you
+want a different location.
+
+### Change the hub port (avoid 9900 conflicts)
+
+The hub binds `127.0.0.1:9900` by default. You can either pin another port or let
+the OS pick a free one automatically.
+
+**Auto (recommended when 9900 is taken):** set `COORD_HUB_PORT=auto`. The hub
+binds a free port, writes the real `host:port` to `<data_dir>/.coord-endpoint.json`,
+and the MCP server and helper scripts discover it from that file — you never pick
+a number.
+
+```json
+{
+  "mcpServers": {
+    "cursor-ab-coord": {
+      "command": "python3",
+      "args": ["mcp/server.py"],
+      "env": { "COORD_HUB_PORT": "auto" }
+    }
+  }
+}
+```
+
+**Pinned:** set a concrete port; host/URL follow automatically.
+
+```bash
+export COORD_HUB_PORT=9931
+./scripts/start.sh          # hub starts on 9931
+./scripts/status.sh         # discovers 9931 from the endpoint file
+```
+
+Generated `/loop` prompts use whatever host:port the UI was opened on, so they
+stay consistent with the chosen port. `COORD_HUB_URL` still wins if you need a
+fully custom URL.
+
+### Run multiple A/B loops at once
+
+Each hub coordinates exactly one A/B loop (single shared state). To run several
+loops in parallel, start one hub per loop, each with its own data directory (and
+an auto port so they never collide):
+
+```bash
+# Loop 1
+COORD_DATA_DIR=~/.coord/loop1 COORD_HUB_PORT=auto ./scripts/start.sh
+# Loop 2
+COORD_DATA_DIR=~/.coord/loop2 COORD_HUB_PORT=auto ./scripts/start.sh
+```
+
+Every helper script honours the same `COORD_DATA_DIR`, so point each loop's
+commands at its own directory. State, pid, log, and the endpoint file all live
+under that directory, keeping the loops fully isolated.
+
+For Marketplace publishing, keep the repository public, validate locally, then
+submit the repository URL at https://cursor.com/marketplace/publish.
 
 ## Manual start (without MCP)
 
@@ -103,6 +178,9 @@ You can also apply a setup profile directly:
 | `./scripts/clear-state.sh` | Remove persisted `.coord-*.json` state/profile/history/lessons |
 
 Script timeouts can be tuned with environment variables such as `COORD_APPLY_TIMEOUT`, `COORD_DOCTOR_TIMEOUT`, `COORD_LESSONS_TIMEOUT`, `COORD_PROMPT_TIMEOUT`, `COORD_RESET_TIMEOUT`, `COORD_SIGNAL_TIMEOUT`, `COORD_SNAPSHOT_TIMEOUT`, `COORD_STATUS_TIMEOUT`, and `COORD_VALIDATE_TIMEOUT`.
+Runtime state, pid, and log files default to the repository root for direct
+script usage. Set `COORD_DATA_DIR` to store them elsewhere; plugin-loaded MCP
+defaults this to `~/.cursor-ab-coord`.
 Profile file arguments may be absolute paths or paths relative to the repository root.
 
 ## MCP tools
@@ -183,6 +261,7 @@ lib/                  # Templates + prompt builder
 lib/version.py        # Shared version for hub and MCP server
 ui/                   # Config UI (served at /ui/)
 mcp/server.py         # MCP stdio server
+commands/             # Plugin slash commands
 .cursor/mcp.json      # Project MCP config
 .cursor/skills/       # Project skills recognized in this repo
 skills/coord-setup/   # Plugin skill copy for distribution

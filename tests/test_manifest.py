@@ -23,6 +23,10 @@ class ManifestTests(unittest.TestCase):
         logo = manifest["logo"]
 
         self.assertEqual(manifest["name"], "cursor-ab-coord")
+        self.assertEqual(manifest["displayName"], "A/B Session Coordination")
+        self.assertEqual(manifest["license"], "MIT")
+        self.assertEqual(manifest["author"]["name"], "cursor-ab-coord")
+        self.assertIn("mcp", manifest["keywords"])
         self.assertFalse(logo.startswith("/"))
         self.assertNotIn("..", Path(logo).parts)
         self.assertTrue((ROOT / logo).is_file())
@@ -34,6 +38,14 @@ class ManifestTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertEqual(plugin_skill, project_skill)
+
+    def test_plugin_command_has_required_frontmatter(self) -> None:
+        command = (ROOT / "commands" / "coord-setup.md").read_text(encoding="utf-8")
+
+        self.assertTrue(command.startswith("---\n"))
+        self.assertIn("name: coord-setup", command)
+        self.assertIn("description:", command)
+        self.assertIn("coord_start", command)
 
 
 if __name__ == "__main__":

@@ -40,6 +40,6 @@ run "quick setup dry run" bash -c './scripts/quick-setup.sh --dry-run "Implement
 run "reset max epochs validation" bash -c '! COORD_MAX_EPOCHS=0 ./scripts/reset.sh "Implement X" >/dev/null 2>&1'
 run "ui js syntax" node --check ui/js/main.js ui/js/i18n.js
 run "website js syntax" node --check website/js/main.js website/js/i18n.js
-run "shell syntax" bash -n scripts/start.sh scripts/stop.sh scripts/status.sh scripts/reset.sh scripts/apply-setup.sh scripts/prompts.sh scripts/signal.sh scripts/lessons.sh scripts/snapshot.sh scripts/quick-setup.sh scripts/doctor.sh scripts/clear-state.sh scripts/validate.sh
+run "shell syntax" bash -n scripts/_hub-url.sh scripts/start.sh scripts/stop.sh scripts/status.sh scripts/reset.sh scripts/apply-setup.sh scripts/prompts.sh scripts/signal.sh scripts/lessons.sh scripts/snapshot.sh scripts/quick-setup.sh scripts/doctor.sh scripts/clear-state.sh scripts/validate.sh watchers/wait-a.sh watchers/wait-b.sh
 
 echo "All checks passed."

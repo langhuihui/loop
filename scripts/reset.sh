@@ -2,7 +2,10 @@
 # Reset hub state. Usage: ./scripts/reset.sh "task description" [branch]
 set -euo pipefail
 
-HUB_URL="${COORD_HUB_URL:-http://127.0.0.1:9900}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/_hub-url.sh"
+HUB_URL="$(coord_resolve_hub_url "$ROOT")"
 TIMEOUT="${COORD_RESET_TIMEOUT:-5}"
 TASK="${1:-}"
 BRANCH="${2:-$(git branch --show-current 2>/dev/null || echo main)}"

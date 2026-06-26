@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import mcp.server as mcp_server
 from lib.version import VERSION
@@ -69,6 +71,91 @@ class McpServerTests(unittest.TestCase):
         self.assertEqual(payload["name"], "cursor-ab-coord")
         self.assertEqual(payload["version"], VERSION)
         self.assertEqual(payload["ui_url"], "http://127.0.0.1:9900/ui/")
+        self.assertEqual(payload["data_dir"], str(mcp_server.DATA_DIR))
+
+    def test_default_data_dir_avoids_plugin_cache_when_installed(self) -> None:
+        with patch.dict(os.environ, {"CURSOR_PLUGIN_ROOT": "/tmp/plugin"}, clear=True):
+            self.assertEqual(mcp_server.default_data_dir(), str(Path.home() / ".cursor-ab-coord"))
+
+    def test_coord_env_passes_data_dir_to_scripts(self) -> None:
+        env = mcp_server.coord_env()
+
+        self.assertEqual(env["COORD_DATA_DIR"], str(mcp_server.DATA_DIR))
+        self.assertEqual(env["COORD_HUB_HOST"], "127.0.0.1")
+        self.assertEqual(env["COORD_HUB_PORT"], "9900")
+        self.assertEqual(env["COORD_HUB_URL"], mcp_server.HUB_URL)
+
+    def test_hub_url_follows_custom_port_without_explicit_url(self) -> None:
+        import importlib
+
+        try:
+            with patch.dict(os.environ, {"COORD_HUB_PORT": "9931"}, clear=True):
+                reloaded = importlib.reload(mcp_server)
+                self.assertEqual(reloaded.HUB_PORT, "9931")
+                self.assertEqual(reloaded.HUB_URL, "http://127.0.0.1:9931")
+                self.assertEqual(reloaded.coord_env()["COORD_HUB_URL"], "http://127.0.0.1:9931")
+        finally:
+            importlib.reload(mcp_server)
+
+    def test_explicit_hub_url_overrides_derived_port(self) -> None:
+        import importlib
+
+        try:
+            with patch.dict(
+                os.environ,
+                {"COORD_HUB_PORT": "9931", "COORD_HUB_URL": "http://127.0.0.1:9999"},
+                clear=True,
+            ):
+                reloaded = importlib.reload(mcp_server)
+                self.assertEqual(reloaded.HUB_URL, "http://127.0.0.1:9999")
+        finally:
+            importlib.reload(mcp_server)
+
+    def test_active_hub_url_prefers_endpoint_file(self) -> None:
+        endpoint = mcp_server.ENDPOINT_PATH
+        existed = endpoint.exists()
+        backup = endpoint.read_text(encoding="utf-8") if existed else None
+        try:
+            endpoint.write_text(
+                json.dumps({"host": "127.0.0.1", "port": 9942, "url": "http://127.0.0.1:9942"}),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(mcp_server.active_hub_url(), "http://127.0.0.1:9942")
+                self.assertEqual(mcp_server.active_ui_url(), "http://127.0.0.1:9942/ui/")
+        finally:
+            if backup is not None:
+                endpoint.write_text(backup, encoding="utf-8")
+            else:
+                endpoint.unlink(missing_ok=True)
+
+    def test_explicit_url_beats_endpoint_file(self) -> None:
+        endpoint = mcp_server.ENDPOINT_PATH
+        existed = endpoint.exists()
+        backup = endpoint.read_text(encoding="utf-8") if existed else None
+        try:
+            endpoint.write_text(
+                json.dumps({"url": "http://127.0.0.1:9942"}), encoding="utf-8"
+            )
+            with patch.dict(os.environ, {"COORD_HUB_URL": "http://127.0.0.1:9999"}, clear=True):
+                self.assertEqual(mcp_server.active_hub_url(), "http://127.0.0.1:9999")
+        finally:
+            if backup is not None:
+                endpoint.write_text(backup, encoding="utf-8")
+            else:
+                endpoint.unlink(missing_ok=True)
+
+    def test_coord_env_omits_url_under_auto_port(self) -> None:
+        import importlib
+
+        try:
+            with patch.dict(os.environ, {"COORD_HUB_PORT": "auto"}, clear=True):
+                reloaded = importlib.reload(mcp_server)
+                self.assertTrue(reloaded.AUTO_PORT)
+                self.assertEqual(reloaded.HUB_URL, "http://127.0.0.1:9900")
+                self.assertNotIn("COORD_HUB_URL", reloaded.coord_env())
+        finally:
+            importlib.reload(mcp_server)
 
     def test_build_profile_from_args_rejects_bad_constraints(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "constraints must be an array of strings"):

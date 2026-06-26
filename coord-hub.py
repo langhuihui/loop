@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import sys
 import threading
 from datetime import datetime, timezone
@@ -39,10 +40,12 @@ from lib.prompt import build_prompt  # noqa: E402
 from lib.version import VERSION  # noqa: E402
 
 UI_DIR = ROOT / "ui"
-STATE_PATH = ROOT / ".coord-state.json"
-PROFILE_PATH = ROOT / ".coord-profile.json"
-HISTORY_PATH = ROOT / ".coord-history.json"
-LESSONS_PATH = ROOT / ".coord-lessons.json"
+DATA_DIR = Path(os.environ.get("COORD_DATA_DIR", str(ROOT))).expanduser()
+STATE_PATH = DATA_DIR / ".coord-state.json"
+PROFILE_PATH = DATA_DIR / ".coord-profile.json"
+HISTORY_PATH = DATA_DIR / ".coord-history.json"
+LESSONS_PATH = DATA_DIR / ".coord-lessons.json"
+ENDPOINT_PATH = DATA_DIR / ".coord-endpoint.json"
 MAX_HISTORY = 50
 MAX_LESSONS = 100
 VALID_OUTCOMES = {"progress", "blocked", "no-op", "done"}
@@ -93,6 +96,7 @@ def parse_json_body(raw: bytes) -> dict[str, Any]:
 
 
 def save_json(path: Path, data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
@@ -157,6 +161,21 @@ def remove_persisted_files() -> None:
         LESSONS_PATH,
         LESSONS_PATH.with_suffix(LESSONS_PATH.suffix + ".tmp"),
     ):
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def write_endpoint(host: str, port: int) -> None:
+    save_json(
+        ENDPOINT_PATH,
+        {"host": host, "port": port, "url": f"http://{host}:{port}"},
+    )
+
+
+def remove_endpoint() -> None:
+    for path in (ENDPOINT_PATH, ENDPOINT_PATH.with_suffix(ENDPOINT_PATH.suffix + ".tmp")):
         try:
             path.unlink()
         except FileNotFoundError:
@@ -789,10 +808,28 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 
+def parse_port(value: str) -> int:
+    """Accept an integer port, or 'auto'/'0' for an OS-assigned free port."""
+    if value == "auto":
+        return 0
+    try:
+        port = int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("port must be an integer or 'auto'") from e
+    if port < 0 or port > 65535:
+        raise argparse.ArgumentTypeError("port must be between 0 and 65535")
+    return port
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="A/B coord hub for Cursor loops")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=9900)
+    parser.add_argument(
+        "--port",
+        type=parse_port,
+        default=9900,
+        help="port number, or 'auto'/'0' for an OS-assigned free port",
+    )
     parser.add_argument("--version", action="store_true", help="print version and exit")
     args = parser.parse_args()
 
@@ -802,9 +839,14 @@ def main() -> None:
 
     load_persisted()
     server = ThreadedHTTPServer((args.host, args.port), Handler)
-    print(f"[coord-hub] listening on http://{args.host}:{args.port}")
-    print(f"[coord-hub] config UI → http://{args.host}:{args.port}/ui/")
-    server.serve_forever()
+    actual_port = server.server_address[1]
+    write_endpoint(args.host, actual_port)
+    print(f"[coord-hub] listening on http://{args.host}:{actual_port}")
+    print(f"[coord-hub] config UI → http://{args.host}:{actual_port}/ui/")
+    try:
+        server.serve_forever()
+    finally:
+        remove_endpoint()
 
 
 if __name__ == "__main__":

@@ -364,9 +364,63 @@ class ExamplesTests(unittest.TestCase):
     def test_clear_state_script_removes_lessons_files(self) -> None:
         script = (ROOT / "scripts" / "clear-state.sh").read_text(encoding="utf-8")
 
+        self.assertIn("COORD_DATA_DIR", script)
         self.assertIn(".coord-lessons.json", script)
         self.assertIn(".coord-lessons.json.tmp", script)
         self.assertIn("state/profile/history/lessons", script)
+
+    def test_scripts_document_plugin_safe_data_dir(self) -> None:
+        for path in (
+            ROOT / "scripts" / "start.sh",
+            ROOT / "scripts" / "stop.sh",
+            ROOT / "scripts" / "clear-state.sh",
+            ROOT / "scripts" / "doctor.sh",
+        ):
+            with self.subTest(path=path):
+                self.assertIn("COORD_DATA_DIR", path.read_text(encoding="utf-8"))
+
+    def test_hub_url_helper_exists_and_is_used(self) -> None:
+        helper = ROOT / "scripts" / "_hub-url.sh"
+        text = helper.read_text(encoding="utf-8")
+        self.assertIn("coord_resolve_hub_url", text)
+        self.assertIn("coord_endpoint_url", text)
+
+        for name in (
+            "status.sh",
+            "doctor.sh",
+            "signal.sh",
+            "snapshot.sh",
+            "lessons.sh",
+            "reset.sh",
+            "prompts.sh",
+            "apply-setup.sh",
+        ):
+            with self.subTest(script=name):
+                script = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+                self.assertIn("_hub-url.sh", script)
+                self.assertIn('coord_resolve_hub_url "$ROOT"', script)
+                self.assertNotIn("http://127.0.0.1:9900", script)
+
+    def test_start_script_supports_auto_port_discovery(self) -> None:
+        text = (ROOT / "scripts" / "start.sh").read_text(encoding="utf-8")
+        self.assertIn('"$PORT" = "auto"', text)
+        self.assertIn("--port \"$LAUNCH_PORT\"", text)
+        self.assertIn("coord_endpoint_url", text)
+
+    def test_clear_state_and_gitignore_cover_endpoint_file(self) -> None:
+        clear = (ROOT / "scripts" / "clear-state.sh").read_text(encoding="utf-8")
+        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn(".coord-endpoint.json", clear)
+        self.assertIn(".coord-endpoint.json", gitignore)
+
+    def test_readme_documents_plugin_install_and_data_dir(self) -> None:
+        text = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("## Cursor plugin install", text)
+        self.assertIn("~/.cursor/plugins/local/cursor-ab-coord", text)
+        self.assertIn("COORD_DATA_DIR", text)
+        self.assertIn("~/.cursor-ab-coord", text)
+        self.assertIn("commands/coord-setup.md", text)
 
     def test_docs_describe_clear_state_lessons_scope(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

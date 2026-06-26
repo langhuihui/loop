@@ -2,7 +2,10 @@
 # Background watcher for Session A — paste into Cursor /loop or run standalone.
 set -euo pipefail
 
-HUB_URL="${COORD_HUB_URL:-http://127.0.0.1:9900}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/_hub-url.sh"
+HUB_URL="$(coord_resolve_hub_url "$ROOT")"
 
 while true; do
   resp=$(curl -sf --max-time 3700 "${HUB_URL}/wait/A" 2>/dev/null || echo "")
