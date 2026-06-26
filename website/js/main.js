@@ -185,6 +185,15 @@ function renderTemplateOptions() {
   if (TEMPLATES[current]) select.value = current;
 }
 
+function readMaxEpochs() {
+  const raw = document.getElementById('maxEpochs').value.trim();
+  const value = Number(raw);
+  if (!raw || !Number.isInteger(value) || value < 1) {
+    throw new Error(typeof t === 'function' ? t('setup.maxEpochsError') : 'Max epochs must be a positive integer');
+  }
+  return value;
+}
+
 function getFormProfile() {
   return {
     template: document.getElementById('templateSelect').value,
@@ -210,7 +219,7 @@ function getFormProfile() {
       branch: document.getElementById('taskBranch').value.trim(),
       constraints: linesToArray(document.getElementById('taskConstraints').value),
     },
-    maxEpochs: parseInt(document.getElementById('maxEpochs').value, 10) || 20,
+    maxEpochs: readMaxEpochs(),
     lang: window.currentLang || 'en',
   };
 }
@@ -231,11 +240,11 @@ while true; do
 done
 
 每轮被唤醒或首次执行时：
-1. curl -s ${hubUrl}/profile  → 读取 roles、workflow、task 约束
-2. curl -s ${hubUrl}/state    → 读取 epoch、turn、stopped
-3. 若 stopped=true 或 epoch >= max_epochs → 总结后停止 loop
-4. 按 profile 中 ${roleLabel} 的 goal、responsibilities、forbidden 执行
-5. 按 workflow.transitions 在完成后 POST ${hubUrl}/signal 给对端
+1. 每轮都重新 curl -s ${hubUrl}/snapshot；不要依赖记忆，尤其是上下文压缩后
+2. 若 snapshot.state.stopped=true、recommended_action=stop，或 epoch >= max_epochs → 总结后停止 loop
+3. 按 profile 中 ${roleLabel} 的 goal、responsibilities、forbidden 执行
+4. 完成后先记录结果，再 POST ${hubUrl}/signal 给对端；payload.outcome 必须是 progress、blocked、no-op、done 之一
+5. 若发现可复用的经验/坑点，POST ${hubUrl}/lessons，包含 role、epoch、text
 6. 同一 epoch 只处理一次；不 push 除非用户要求`;
   }
 
@@ -249,11 +258,11 @@ while true; do
 done
 
 Each wake or first run:
-1. curl -s ${hubUrl}/profile  → roles, workflow, task constraints
-2. curl -s ${hubUrl}/state    → epoch, turn, stopped
-3. If stopped=true or epoch >= max_epochs → summarize and stop loop
-4. Follow ${roleLabel} goal, responsibilities, forbidden from profile
-5. On completion POST ${hubUrl}/signal per workflow.transitions
+1. Re-read curl -s ${hubUrl}/snapshot every round; do not rely on memory, especially after context compaction
+2. If snapshot.state.stopped=true, recommended_action=stop, or epoch >= max_epochs → summarize and stop loop
+3. Follow ${roleLabel} goal, responsibilities, forbidden from profile
+4. Record the result before advancing, then POST ${hubUrl}/signal to the other role; payload.outcome must be one of progress, blocked, no-op, done
+5. When you learn a reusable lesson or pitfall, POST ${hubUrl}/lessons with role, epoch, text
 6. Process each epoch once; do not push unless user asks`;
 }
 
@@ -276,7 +285,13 @@ function applyTemplate(templateId) {
 }
 
 function generatePrompts() {
-  const profile = getFormProfile();
+  let profile;
+  try {
+    profile = getFormProfile();
+  } catch (err) {
+    window.alert(err.message);
+    return;
+  }
   const hubUrl = document.getElementById('hubUrl').value.trim().replace(/\/$/, '');
 
   const promptA = buildPrompt('A', profile, hubUrl);

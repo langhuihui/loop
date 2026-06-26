@@ -1,0 +1,51 @@
+{
+  "template": "dev-review",
+  "roles": {
+    "A": {
+      "name": "开发者",
+      "goal": "按小步实现用户任务；每完成一块即交给审查者。",
+      "responsibilities": [
+        "从 Hub 读取当前任务与约束",
+        "在 state.branch 上实现下一小块功能",
+        "完成一块后 signal 审查者"
+      ],
+      "forbidden": [
+        "不要修 review 反馈 — 那是 B 的工作",
+        "不要 push，除非用户要求"
+      ],
+      "wakeSentinel": "AGENT_LOOP_WAKE_A"
+    },
+    "B": {
+      "name": "审查者",
+      "goal": "审查开发者变更；能修则直接修并提交。",
+      "responsibilities": [
+        "审查 A 的 diff 与提交",
+        "直接修复明确问题",
+        "用英文 message 提交，然后 signal A 继续"
+      ],
+      "forbidden": [
+        "不要扩展任务范围",
+        "不要 push，除非用户要求"
+      ],
+      "wakeSentinel": "AGENT_LOOP_WAKE_B"
+    }
+  },
+  "workflow": {
+    "initialTurn": "A",
+    "transitions": [
+      { "from": "A", "to": "B", "action": "review" },
+      { "from": "B", "to": "A", "action": "continue_dev" },
+      { "from": "B", "to": "A", "action": "blocked", "stop": true }
+    ]
+  },
+  "task": {
+    "title": "实现功能 X",
+    "branch": "main",
+    "constraints": [
+      "不要启动测试服务器",
+      "提交信息用英文"
+    ]
+  },
+  "maxEpochs": 20,
+  "lang": "zh"
+}

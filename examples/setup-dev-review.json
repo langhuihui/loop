@@ -1,0 +1,51 @@
+{
+  "template": "dev-review",
+  "roles": {
+    "A": {
+      "name": "builder",
+      "goal": "Implement the user task in small slices; hand off to reviewer when each slice is done.",
+      "responsibilities": [
+        "Read current task and constraints from hub",
+        "Implement the next small slice on state.branch",
+        "Signal reviewer when a slice is complete"
+      ],
+      "forbidden": [
+        "Do not fix review feedback — that is B's job",
+        "Do not push unless user asks"
+      ],
+      "wakeSentinel": "AGENT_LOOP_WAKE_A"
+    },
+    "B": {
+      "name": "reviewer",
+      "goal": "Review builder changes; fix issues directly and commit when appropriate.",
+      "responsibilities": [
+        "Review A's diff and commits",
+        "Fix clear issues yourself",
+        "Commit with English message, then signal A to continue"
+      ],
+      "forbidden": [
+        "Do not expand scope beyond the task",
+        "Do not push unless user asks"
+      ],
+      "wakeSentinel": "AGENT_LOOP_WAKE_B"
+    }
+  },
+  "workflow": {
+    "initialTurn": "A",
+    "transitions": [
+      { "from": "A", "to": "B", "action": "review" },
+      { "from": "B", "to": "A", "action": "continue_dev" },
+      { "from": "B", "to": "A", "action": "blocked", "stop": true }
+    ]
+  },
+  "task": {
+    "title": "Implement feature X",
+    "branch": "main",
+    "constraints": [
+      "Do not start test servers",
+      "Commit messages in English"
+    ]
+  },
+  "maxEpochs": 20,
+  "lang": "en"
+}

@@ -3,16 +3,29 @@
 set -euo pipefail
 
 HUB_URL="${COORD_HUB_URL:-http://127.0.0.1:9900}"
+TIMEOUT="${COORD_RESET_TIMEOUT:-5}"
 TASK="${1:-}"
 BRANCH="${2:-$(git branch --show-current 2>/dev/null || echo main)}"
 MAX_EPOCHS="${COORD_MAX_EPOCHS:-20}"
 
 if [ -z "$TASK" ]; then
   echo "Usage: $0 <task> [branch]" >&2
-  exit 1
+  exit 2
 fi
 
-curl -sf --max-time 5 -X POST "${HUB_URL}/reset" \
+case "$MAX_EPOCHS" in
+  ''|*[!0-9]*)
+    echo "COORD_MAX_EPOCHS must be a positive integer" >&2
+    exit 2
+    ;;
+esac
+
+if [ "$MAX_EPOCHS" -lt 1 ]; then
+  echo "COORD_MAX_EPOCHS must be a positive integer" >&2
+  exit 2
+fi
+
+curl -sf --max-time "$TIMEOUT" -X POST "${HUB_URL}/reset" \
   -H 'Content-Type: application/json' \
   -d "$(python3 -c "
 import json, sys

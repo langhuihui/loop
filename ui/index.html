@@ -26,7 +26,13 @@
     <section class="panel">
       <div class="panel-head">
         <h2 data-i18n="config.title">Configuration</h2>
-        <button type="button" class="btn-primary" id="generateBtn" data-i18n="config.generate">Generate &amp; apply</button>
+        <div class="panel-actions">
+          <button type="button" class="btn-secondary" id="importProfileBtn" data-i18n="config.importProfile">Import profile</button>
+          <button type="button" class="btn-secondary" id="exportProfileBtn" data-i18n="config.exportProfile">Export profile</button>
+          <button type="button" class="btn-secondary btn-danger" id="clearStateBtn" data-i18n="config.clearState">Clear state</button>
+          <button type="button" class="btn-primary" id="generateBtn" data-i18n="config.generate">Generate &amp; apply</button>
+          <input type="file" id="profileFileInput" accept="application/json,.json" hidden>
+        </div>
       </div>
       <p class="error" id="formError" hidden></p>
 
@@ -76,7 +82,7 @@
           </div>
           <div class="field">
             <label for="maxEpochs" data-i18n="field.maxEpochs">Max epochs</label>
-            <input id="maxEpochs" type="number" min="1" max="100" value="20">
+            <input id="maxEpochs" type="number" min="1" max="100" step="1" value="20">
           </div>
         </div>
         <label for="taskConstraints" data-i18n="field.constraints">Constraints (one per line)</label>
@@ -87,7 +93,10 @@
     <section class="panel">
       <div class="panel-head">
         <h2 data-i18n="prompts.title">Session prompts</h2>
-        <p class="hint" data-i18n="prompts.hint">Start <strong>Session B</strong> first, then <strong>Session A</strong>.</p>
+        <div class="panel-actions">
+          <p class="hint" data-i18n="prompts.hint">Start <strong>Session B</strong> first, then <strong>Session A</strong>.</p>
+          <button type="button" class="btn-secondary" id="copyAllBtn" data-i18n="prompts.copyAll" disabled>Copy all</button>
+        </div>
       </div>
 
       <div class="prompts-grid">
@@ -109,8 +118,37 @@
       </div>
 
       <details>
-        <summary data-i18n="prompts.hubState">Hub state</summary>
+        <summary>
+          <span data-i18n="prompts.hubState">Hub state</span>
+          <button type="button" class="btn-inline" id="refreshSnapshotBtn" data-i18n="snapshot.refresh">Refresh snapshot</button>
+        </summary>
+        <div id="healthWarnings" class="health-warnings empty" data-i18n="health.ok">No health warnings.</div>
+        <div id="outcomeCounts" class="outcome-counts"></div>
         <pre id="stateJson" class="json-preview">{}</pre>
+      </details>
+
+      <details>
+        <summary>
+          <span data-i18n="prompts.hubHistory">Hub history</span>
+          <button type="button" class="btn-inline" id="refreshHistoryBtn" data-i18n="prompts.refresh">Refresh</button>
+        </summary>
+        <pre id="historyJson" class="json-preview">[]</pre>
+      </details>
+
+      <details open>
+        <summary>
+          <span data-i18n="lessons.title">Shared lessons</span>
+          <button type="button" class="btn-inline" id="refreshLessonsBtn" data-i18n="prompts.refresh">Refresh</button>
+        </summary>
+        <div id="lessonsList" class="lessons-list empty" data-i18n="lessons.empty">No lessons yet.</div>
+        <div class="lesson-form">
+          <select id="lessonRole" aria-label="Lesson role">
+            <option value="A">A</option>
+            <option value="B">B</option>
+          </select>
+          <input id="lessonText" type="text" data-i18n-placeholder="lessons.placeholder" placeholder="Reusable note or pitfall">
+          <button type="button" class="btn-secondary" id="addLessonBtn" data-i18n="lessons.add">Add lesson</button>
+        </div>
       </details>
     </section>
   </main>
