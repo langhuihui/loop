@@ -398,6 +398,17 @@ class ExamplesTests(unittest.TestCase):
         self.assertIn("<code>/snapshot</code>", text)
         self.assertNotIn("Agents read <code>/profile</code> and <code>/state</code>", text)
 
+    def test_static_website_html_matches_snapshot_protocol(self) -> None:
+        text = (ROOT / "website" / "index.html").read_text(encoding="utf-8")
+
+        self.assertIn("Profile JSON (POST /setup)", text)
+        self.assertIn("<code>/snapshot</code>", text)
+        self.assertIn("<code>/lessons</code>", text)
+        self.assertIn("<code>coord_snapshot</code>", text)
+        self.assertNotIn("POST /profile", text)
+        self.assertNotIn("Agents read <code>/profile</code> and <code>/state</code>", text)
+        self.assertNotIn("<code>/profile</code> · <code>/reset</code>", text)
+
     def test_coord_setup_skills_describe_snapshot_runtime(self) -> None:
         for path in (
             ROOT / "skills" / "coord-setup" / "SKILL.md",

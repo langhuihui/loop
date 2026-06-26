@@ -234,7 +234,7 @@
           </div>
 
           <details class="profile-preview">
-            <summary data-i18n="setup.profileJson">Profile JSON (POST /profile)</summary>
+            <summary data-i18n="setup.profileJson">Profile JSON (POST /setup)</summary>
             <pre class="profile-json" id="profileJson"></pre>
           </details>
         </div>
@@ -255,7 +255,7 @@
       <div class="feature-card">
         <div class="feature-icon">📋</div>
         <h3 data-i18n="feat3.title">Short prompts</h3>
-        <p data-i18n="feat3.desc">Agents read <code>/profile</code> and <code>/state</code> — rules live on the hub, not in chat.</p>
+        <p data-i18n="feat3.desc">Agents re-anchor with <code>/snapshot</code> — state, profile, history, lessons, and health live on the hub.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🔁</div>
@@ -284,9 +284,9 @@
           <div class="arch-layer mcp" data-i18n="arch.mcp.layer">MCP</div>
           <h3 data-i18n="arch.mcp.title">coord_* tools</h3>
           <ul>
-            <li><code>coord_start</code> · <code>coord_stop</code></li>
-            <li><code>coord_state</code> · <code>coord_reset</code></li>
-            <li><code>coord_signal</code> · <code>coord_profile</code></li>
+            <li data-i18n="arch.mcp.1"><code>coord_start</code> · <code>coord_doctor</code></li>
+            <li data-i18n="arch.mcp.2"><code>coord_snapshot</code> · <code>coord_lessons</code></li>
+            <li data-i18n="arch.mcp.3"><code>coord_signal</code> · <code>coord_signal_outcome</code></li>
           </ul>
         </div>
         <div class="arch-card">
@@ -302,9 +302,9 @@
           <div class="arch-layer hub" data-i18n="arch.hub.layer">Hub</div>
           <h3 data-i18n="arch.hub.title">coord-hub.py</h3>
           <ul>
-            <li><code>/wait/A</code> · <code>/wait/B</code></li>
-            <li><code>/signal</code> · <code>/state</code></li>
-            <li><code>/profile</code> · <code>/reset</code></li>
+            <li data-i18n="arch.hub.1"><code>/wait/A</code> · <code>/wait/B</code></li>
+            <li data-i18n="arch.hub.2"><code>/snapshot</code> · <code>/lessons</code> · <code>/health</code></li>
+            <li data-i18n="arch.hub.3"><code>/signal</code> · <code>/setup</code> · <code>/reset</code></li>
           </ul>
         </div>
       </div>

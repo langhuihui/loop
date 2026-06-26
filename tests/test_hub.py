@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import importlib.util
+import json
 import subprocess
 import sys
 import unittest
@@ -17,6 +19,16 @@ def load_hub_module() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def make_handler(hub: ModuleType, path: str, body: bytes = b"") -> object:
+    handler = object.__new__(hub.Handler)
+    handler.path = path
+    handler.headers = {"Content-Length": str(len(body))}
+    handler.rfile = io.BytesIO(body)
+    handler.responses = []
+    handler._json = lambda code, obj: handler.responses.append((code, obj))
+    return handler
 
 
 class HubTests(unittest.TestCase):
@@ -431,6 +443,74 @@ class HubTests(unittest.TestCase):
         self.assertIn(("header", "Content-Length", "0"), calls)
         self.assertIn(("cors", None, None), calls)
         self.assertIn(("end", None, None), calls)
+
+    def test_handler_rejects_invalid_post_json(self) -> None:
+        hub = load_hub_module()
+        handler = make_handler(hub, "/signal", b"{")
+
+        hub.Handler.do_POST(handler)
+
+        self.assertEqual(handler.responses, [(400, {"error": "request body must be valid JSON"})])
+
+    def test_handler_rejects_invalid_snapshot_query(self) -> None:
+        hub = load_hub_module()
+        handler = make_handler(hub, "/snapshot?history_limit=0")
+
+        hub.Handler.do_GET(handler)
+
+        self.assertEqual(handler.responses, [(400, {"error": "history_limit must be >= 1"})])
+
+    def test_handler_rejects_invalid_templates_lang(self) -> None:
+        hub = load_hub_module()
+        handler = make_handler(hub, "/templates?lang=fr")
+
+        hub.Handler.do_GET(handler)
+
+        self.assertEqual(handler.responses, [(400, {"error": "lang must be en or zh"})])
+
+    def test_handler_rejects_invalid_history_since_id(self) -> None:
+        hub = load_hub_module()
+        handler = make_handler(hub, "/history?since_id=-1")
+
+        hub.Handler.do_GET(handler)
+
+        self.assertEqual(handler.responses, [(400, {"error": "since_id must be >= 0"})])
+
+    def test_handler_rejects_lesson_without_role(self) -> None:
+        hub = load_hub_module()
+        body = json.dumps({"text": "remember this"}).encode()
+        handler = make_handler(hub, "/lessons", body)
+
+        hub.Handler.do_POST(handler)
+
+        self.assertEqual(handler.responses, [(400, {"error": "role must be A or B"})])
+
+    def test_handler_clear_resets_lessons_and_ids(self) -> None:
+        hub = load_hub_module()
+        hub.remove_persisted_files = lambda: None
+        hub.state.clear()
+        hub.state.update(hub.DEFAULT_STATE)
+        hub.state["epoch"] = 3
+        hub.profile = {"template": "dev-review", "roles": {}}
+        hub.history[:] = [{"id": 1, "event": "setup"}]
+        hub.lessons[:] = [{"id": 1, "role": "A", "text": "old", "epoch": 1}]
+        hub.next_history_id = 2
+        hub.next_lesson_id = 2
+        hub.pending["A"] = (3, {"outcome": "progress"})
+        hub.pending["B"] = (3, {"outcome": "blocked"})
+        body = json.dumps({"confirm": True}).encode()
+        handler = make_handler(hub, "/clear", body)
+
+        hub.Handler.do_POST(handler)
+
+        self.assertEqual(handler.responses[0][0], 200)
+        self.assertEqual(hub.lessons, [])
+        self.assertEqual(hub.next_lesson_id, 1)
+        self.assertEqual(hub.history, [])
+        self.assertEqual(hub.next_history_id, 1)
+        self.assertIsNone(hub.profile)
+        self.assertIsNone(hub.pending["A"])
+        self.assertIsNone(hub.pending["B"])
 
 
 if __name__ == "__main__":
