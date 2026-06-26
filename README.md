@@ -228,10 +228,16 @@ The recommended path is still the UI. `coord_quick_setup` exists for fully agent
 | GET | `/lessons` | Recent shared lessons (`?limit=20`) |
 | POST | `/lessons` | Add a shared lesson (`role`, `epoch`, `text`) |
 | GET | `/prompt/A` · `/prompt/B` | Generated `/loop` prompt |
-| GET | `/wait/A` · `/wait/B` | Long-poll wake |
-| POST | `/signal` | Signal target role; include `payload.outcome` (`progress`, `blocked`, `no-op`, `done`) |
+| GET | `/wait/A` · `/wait/B` | Long-poll wake; returns a wake `id` |
+| POST | `/signal` | Signal target role; include `payload.outcome` (`progress`, `blocked`, `no-op`, `done`). `turn` defaults to `target` when omitted |
 | POST | `/reset` | Reset state |
 | GET | `/ui/` | Config UI |
+
+`/wait/<role>` supports `?since=<wake_id>` for self-healing watchers. New
+prompts keep `last_wake_id` locally and call `/wait/A?since=${last_wake_id}` (or
+role B). The hub fans out each signal to every currently waiting watcher, so a
+stale duplicate watcher can no longer steal the only wake message. Older
+watchers without `since` still work as a one-shot compatibility path.
 
 ## Workflow templates
 

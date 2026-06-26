@@ -18,6 +18,12 @@ class PromptTests(unittest.TestCase):
 
         self.assertIn("You are coord role A (builder)", prompt)
         self.assertIn("http://127.0.0.1:9900/wait/A", prompt)
+        self.assertIn("?since=${last_wake_id}", prompt)
+        self.assertIn("last_wake_id=0", prompt)
+        self.assertIn("duplicate watchers cannot steal", prompt)
+        self.assertIn("do not redirect it to a file", prompt)
+        self.assertIn("only act when state.turn == A", prompt)
+        self.assertIn("the hub defaults turn to the signal target", prompt)
         self.assertNotIn("http://127.0.0.1:9900//wait/A", prompt)
         self.assertIn("AGENT_LOOP_WAKE_A", prompt)
         self.assertIn("recommended_action=stop", prompt)
@@ -57,6 +63,11 @@ class PromptTests(unittest.TestCase):
         self.assertIn("POST http://127.0.0.1:9900/signal", prompt)
         self.assertIn("POST http://127.0.0.1:9900/lessons", prompt)
         self.assertIn("http://127.0.0.1:9900/wait/B", prompt)
+        self.assertIn("?since=${last_wake_id}", prompt)
+        self.assertIn("自愈去重", prompt)
+        self.assertIn("不要重定向到文件", prompt)
+        self.assertIn("仅当 state.turn == B 时才执行", prompt)
+        self.assertIn("hub 默认把 turn 设为 signal 的 target", prompt)
         self.assertIn("AGENT_LOOP_WAKE_B", prompt)
 
     def test_invalid_role_is_rejected(self) -> None:

@@ -73,9 +73,11 @@ history: list[dict[str, Any]] = []
 next_history_id = 1
 lessons: list[dict[str, Any]] = []
 next_lesson_id = 1
+next_message_id = 1
 
-waiters: dict[str, list[tuple[threading.Event, int]]] = {"A": [], "B": []}
-pending: dict[str, tuple[int, dict[str, Any]] | None] = {"A": None, "B": None}
+waiters: dict[str, list[dict[str, Any]]] = {"A": [], "B": []}
+pending: dict[str, dict[str, Any] | None] = {"A": None, "B": None}
+last_messages: dict[str, dict[str, Any] | None] = {"A": None, "B": None}
 
 
 def load_json(path: Path) -> Any:
@@ -182,17 +184,31 @@ def remove_endpoint() -> None:
             pass
 
 
+def make_wait_message(epoch: int, payload: dict[str, Any]) -> dict[str, Any]:
+    global next_message_id
+
+    message = {"id": next_message_id, "epoch": epoch, "payload": dict(payload)}
+    next_message_id += 1
+    return message
+
+
 def notify_role(role: str, epoch: int, payload: dict[str, Any]) -> None:
     with lock:
-        pending[role] = (epoch, payload)
-        for ev, _ in waiters.get(role, []):
-            ev.set()
+        message = make_wait_message(epoch, payload)
+        last_messages[role] = message
+        role_waiters = waiters.get(role, [])
+        if role_waiters:
+            for waiter in role_waiters:
+                waiter["message"] = message
+                waiter["event"].set()
+        else:
+            pending[role] = message
 
 
 def wake_waiters_locked() -> None:
     for role_waiters in waiters.values():
-        for ev, _ in role_waiters:
-            ev.set()
+        for waiter in role_waiters:
+            waiter["event"].set()
 
 
 def append_history(event: str, data: dict[str, Any]) -> None:
@@ -423,12 +439,25 @@ def outcome_counts() -> dict[str, int]:
     return counts
 
 
+def runtime_status() -> dict[str, Any]:
+    """Live coordination internals for debugging turn-taking and wake delivery."""
+    return {
+        "waiters": {role: len(waiters.get(role, [])) for role in ("A", "B")},
+        "pending": {
+            role: (pending[role]["id"] if pending.get(role) else None)
+            for role in ("A", "B")
+        },
+        "last_wake_id": {
+            role: (last_messages[role]["id"] if last_messages.get(role) else None)
+            for role in ("A", "B")
+        },
+        "next_message_id": next_message_id,
+    }
+
+
 def state_response_body() -> dict[str, Any]:
     body = dict(state)
-    body["pending"] = {
-        k: {"epoch": v[0], "payload": v[1]} if v else None
-        for k, v in pending.items()
-    }
+    body["pending"] = {k: dict(v) if v else None for k, v in pending.items()}
     body["has_profile"] = profile is not None
     return body
 
@@ -442,6 +471,7 @@ def snapshot_response_body(history_limit: int = 10, lessons_limit: int = 20) -> 
         "profile": dict(profile) if profile is not None else None,
         "history": list(history[-max(1, min(history_limit, MAX_HISTORY)) :]),
         "lessons": list(lessons[-max(1, min(lessons_limit, MAX_LESSONS)) :]),
+        "runtime": runtime_status(),
         "health": {
             "warnings": warnings,
             "outcome_counts": outcome_counts(),
@@ -491,6 +521,7 @@ class Handler(BaseHTTPRequestHandler):
                     "next_history_id": next_history_id,
                     "lessons_size": len(lessons),
                     "outcome_counts": outcome_counts(),
+                    "runtime": runtime_status(),
                     "warnings": warnings,
                     "ui_path": "/ui/",
                 }
@@ -578,22 +609,45 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "role must be A or B"})
                 return
 
+            since_raw = (query.get("since") or [""])[0]
+            use_since = since_raw != ""
+            try:
+                since = parse_query_nonnegative_int(since_raw, "since", 0) if use_since else None
+            except ValueError as e:
+                self._json(400, {"error": str(e)})
+                return
+
             ev = threading.Event()
+            waiter: dict[str, Any] = {"event": ev, "message": None}
             with lock:
-                if pending[role] is not None:
-                    epoch, payload = pending[role]
+                if use_since:
+                    message = last_messages[role]
+                    if message is not None and int(message["id"]) > int(since):
+                        self._json(200, dict(message))
+                        return
+                elif pending[role] is not None:
+                    message = pending[role]
                     pending[role] = None
-                    self._json(200, {"epoch": epoch, "payload": payload})
+                    self._json(200, dict(message))
                     return
-                waiters[role].append((ev, state["epoch"]))
+                waiters[role].append(waiter)
 
             ev.wait(timeout=3600)
             with lock:
-                waiters[role] = [(e, ep) for e, ep in waiters[role] if e is not ev]
-                if pending[role] is not None:
-                    epoch, payload = pending[role]
+                waiters[role] = [item for item in waiters[role] if item is not waiter]
+                message = waiter.get("message")
+                if message is not None:
+                    self._json(200, dict(message))
+                    return
+                if use_since:
+                    message = last_messages[role]
+                    if message is not None and int(message["id"]) > int(since):
+                        self._json(200, dict(message))
+                        return
+                elif pending[role] is not None:
+                    message = pending[role]
                     pending[role] = None
-                    self._json(200, {"epoch": epoch, "payload": payload})
+                    self._json(200, dict(message))
                     return
 
             self._json(204, {})
@@ -602,7 +656,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_POST(self) -> None:
-        global next_history_id, next_lesson_id, profile
+        global next_history_id, next_lesson_id, next_message_id, profile
         path = urlparse(self.path).path
         try:
             body = self._read_json()
@@ -622,8 +676,11 @@ class Handler(BaseHTTPRequestHandler):
                 next_history_id = 1
                 lessons.clear()
                 next_lesson_id = 1
+                next_message_id = 1
                 pending["A"] = None
                 pending["B"] = None
+                last_messages["A"] = None
+                last_messages["B"] = None
                 wake_waiters_locked()
                 snap = dict(state)
             remove_persisted_files()
@@ -640,8 +697,10 @@ class Handler(BaseHTTPRequestHandler):
             with lock:
                 if new_epoch is not None:
                     state["epoch"] = new_epoch
-                if new_turn is not None:
-                    state["turn"] = new_turn
+                # A signal hands the turn to the target by default. The agent may
+                # still override turn explicitly, but omitting it can no longer
+                # leave a stale turn that confuses the other role on cold start.
+                state["turn"] = new_turn if new_turn is not None else target
                 if "verdict" in body:
                     state["verdict"] = body["verdict"]
                 if stopped is True:
@@ -695,6 +754,8 @@ class Handler(BaseHTTPRequestHandler):
                 state.update(reset_fields)
                 pending["A"] = None
                 pending["B"] = None
+                last_messages["A"] = None
+                last_messages["B"] = None
                 wake_waiters_locked()
                 snap = dict(state)
             persist_profile(body)
@@ -741,6 +802,8 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 pending["A"] = None
                 pending["B"] = None
+                last_messages["A"] = None
+                last_messages["B"] = None
                 wake_waiters_locked()
                 snap = dict(state)
             persist_state(snap)

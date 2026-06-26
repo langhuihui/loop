@@ -259,13 +259,106 @@ function renderOutcomeCounts(counts = {}) {
   el.textContent = `${t('outcomes.label')}: ${parts.join(' · ')}`;
 }
 
+function chip(label, value, cls = '') {
+  return `<span class="summary-chip ${cls}"><span class="chip-key">${label}</span> ${value}</span>`;
+}
+
+function renderStatusSummary(state) {
+  const el = document.getElementById('statusSummary');
+  if (!state) {
+    el.innerHTML = `<span class="summary-chip muted">${t('live.waiting')}</span>`;
+    return;
+  }
+  const maxEpochs = state.max_epochs ?? state.maxEpochs;
+  const epochVal = maxEpochs ? `${state.epoch} / ${maxEpochs}` : `${state.epoch}`;
+  const chips = [
+    chip(t('live.epoch'), epochVal),
+    chip(t('field.branch'), state.branch || 'main'),
+  ];
+  if (state.recommended_action) {
+    chips.push(chip(t('live.action'), state.recommended_action));
+  }
+  chips.push(
+    state.stopped
+      ? chip(t('live.stopped'), '✓', 'danger')
+      : chip(t('live.running'), '●', 'ok'),
+  );
+  if (Number(state.stagnation_count) > 0) {
+    chips.push(chip(t('live.stagnation'), state.stagnation_count, 'warn'));
+  }
+  if (state.verdict) {
+    chips.push(chip(t('live.verdict'), state.verdict));
+  }
+  el.innerHTML = chips.join('');
+}
+
+function renderRoleStatus(role, state, runtime) {
+  const waiters = runtime?.waiters?.[role] ?? 0;
+  const pendingId = runtime?.pending?.[role];
+  const lastWake = runtime?.last_wake_id?.[role];
+
+  const turnPill = document.getElementById(`turnPill${role}`);
+  turnPill.hidden = !(state && state.turn === role);
+  document.getElementById(`statusCard${role}`).classList.toggle(
+    'is-turn',
+    Boolean(state && state.turn === role),
+  );
+
+  const watcherEl = document.getElementById(`watcher${role}`);
+  watcherEl.textContent = waiters > 0 ? t('live.watcherOn', { n: waiters }) : t('live.watcherOff');
+  watcherEl.className = `metric-val ${waiters > 0 ? 'ok' : 'bad'}`;
+
+  const pendingEl = document.getElementById(`pending${role}`);
+  if (pendingId != null) {
+    pendingEl.textContent = `#${pendingId}`;
+    pendingEl.className = 'metric-val warn';
+  } else {
+    pendingEl.textContent = t('live.none');
+    pendingEl.className = 'metric-val muted';
+  }
+
+  const lastWakeEl = document.getElementById(`lastWake${role}`);
+  lastWakeEl.textContent = lastWake != null ? `#${lastWake}` : '—';
+  lastWakeEl.className = 'metric-val muted';
+}
+
+function renderRuntime(state, runtime) {
+  renderStatusSummary(state);
+  document.getElementById('statusNameA').textContent =
+    currentProfile?.roles?.A?.name || t('role.a');
+  document.getElementById('statusNameB').textContent =
+    currentProfile?.roles?.B?.name || t('role.b');
+  renderRoleStatus('A', state, runtime);
+  renderRoleStatus('B', state, runtime);
+}
+
+function renderLiveHealth(warnings) {
+  const el = document.getElementById('liveHealth');
+  el.textContent = '';
+  if (!warnings?.length) {
+    el.classList.add('empty');
+    el.textContent = t('health.ok');
+    return;
+  }
+  el.classList.remove('empty');
+  warnings.forEach((warning) => {
+    const item = document.createElement('div');
+    item.className = 'health-warning';
+    item.textContent = warning;
+    el.appendChild(item);
+  });
+}
+
 function renderSnapshot(snapshot) {
   const state = snapshot?.state || null;
   const health = snapshot?.health || {};
-  hubState = state ? { ...state, health } : null;
+  const runtime = snapshot?.runtime || null;
+  hubState = state ? { ...state, health, runtime } : null;
   renderHubStatus(hubState);
   renderHealthWarnings(health.warnings || []);
+  renderLiveHealth(health.warnings || []);
   renderOutcomeCounts(health.outcome_counts || {});
+  renderRuntime(state, runtime);
   document.getElementById('historyJson').textContent = JSON.stringify(snapshot?.history || [], null, 2);
   renderLessons(snapshot?.lessons || []);
 }
@@ -279,10 +372,31 @@ async function checkHub() {
     hubState = null;
     renderHubStatus(null);
     renderHealthWarnings([]);
+    renderLiveHealth([]);
     renderOutcomeCounts({});
+    renderRuntime(null, null);
     document.getElementById('historyJson').textContent = '[]';
     renderLessons([]);
     return null;
+  }
+}
+
+let liveRefreshTimer = null;
+
+function startLiveRefresh() {
+  stopLiveRefresh();
+  liveRefreshTimer = setInterval(() => {
+    if (isBusy) return;
+    if (!document.getElementById('autoRefreshToggle')?.checked) return;
+    if (document.hidden) return;
+    checkHub();
+  }, 3000);
+}
+
+function stopLiveRefresh() {
+  if (liveRefreshTimer) {
+    clearInterval(liveRefreshTimer);
+    liveRefreshTimer = null;
   }
 }
 
@@ -498,7 +612,9 @@ window.onLanguageChange = async () => {
   updateEmptyPromptPlaceholders();
   renderLessons(currentLessons);
   renderHealthWarnings(hubState?.health?.warnings || []);
+  renderLiveHealth(hubState?.health?.warnings || []);
   renderOutcomeCounts(hubState?.health?.outcome_counts || {});
+  renderRuntime(hubState, hubState?.runtime || null);
   renderHubStatus(hubState);
 
   const hasPrompts = !document.getElementById('promptA').classList.contains('empty');
@@ -546,6 +662,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('generateBtn').addEventListener('click', applySetup);
   document.getElementById('clearStateBtn').addEventListener('click', clearState);
   document.getElementById('refreshSnapshotBtn').addEventListener('click', checkHub);
+  document.getElementById('refreshLiveBtn').addEventListener('click', checkHub);
+  document.getElementById('autoRefreshToggle').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      checkHub();
+      startLiveRefresh();
+    } else {
+      stopLiveRefresh();
+    }
+  });
+  startLiveRefresh();
   document.getElementById('refreshHistoryBtn').addEventListener('click', loadHistory);
   document.getElementById('refreshLessonsBtn').addEventListener('click', loadLessons);
   document.getElementById('addLessonBtn').addEventListener('click', addLesson);

@@ -349,6 +349,121 @@ summary { cursor: pointer; margin-bottom: 0.5rem; }
   font-size: 0.7rem;
 }
 
+.autorefresh {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.autorefresh input {
+  width: auto;
+  margin: 0;
+}
+
+.status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+.summary-chip .chip-key {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.62rem;
+}
+
+.summary-chip.muted { color: var(--muted); font-style: italic; }
+.summary-chip.ok { border-color: rgba(52, 211, 153, 0.4); color: #34d399; }
+.summary-chip.warn { border-color: rgba(251, 191, 36, 0.4); color: #fbbf24; }
+.summary-chip.danger { border-color: rgba(248, 113, 113, 0.4); color: var(--danger); }
+
+.status-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.status-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.status-card.is-turn {
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.25) inset;
+}
+
+.status-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.65rem;
+}
+
+.turn-pill {
+  margin-left: auto;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.status-metrics {
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.status-metrics li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.metric-val {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--text);
+}
+
+.metric-val.ok { color: #34d399; }
+.metric-val.bad { color: var(--danger); }
+.metric-val.warn { color: #fbbf24; }
+.metric-val.muted { color: var(--muted); }
+
 .lessons-list {
   display: grid;
   gap: 0.45rem;
@@ -418,6 +533,7 @@ summary { cursor: pointer; margin-bottom: 0.5rem; }
   .roles-grid,
   .task-grid,
   .prompts-grid,
+  .status-board,
   .lesson-form {
     grid-template-columns: 1fr;
   }

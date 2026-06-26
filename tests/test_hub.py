@@ -287,13 +287,57 @@ class HubTests(unittest.TestCase):
         hub = load_hub_module()
         ev_a = hub.threading.Event()
         ev_b = hub.threading.Event()
-        hub.waiters["A"] = [(ev_a, 1)]
-        hub.waiters["B"] = [(ev_b, 2)]
+        hub.waiters["A"] = [{"event": ev_a, "message": None}]
+        hub.waiters["B"] = [{"event": ev_b, "message": None}]
 
         hub.wake_waiters_locked()
 
         self.assertTrue(ev_a.is_set())
         self.assertTrue(ev_b.is_set())
+
+    def test_notify_role_fans_out_to_all_current_waiters(self) -> None:
+        hub = load_hub_module()
+        ev1 = hub.threading.Event()
+        ev2 = hub.threading.Event()
+        waiter1 = {"event": ev1, "message": None}
+        waiter2 = {"event": ev2, "message": None}
+        hub.waiters["A"] = [waiter1, waiter2]
+        hub.pending["A"] = None
+        hub.last_messages["A"] = None
+
+        hub.notify_role("A", 7, {"outcome": "progress"})
+
+        self.assertTrue(ev1.is_set())
+        self.assertTrue(ev2.is_set())
+        self.assertIsNone(hub.pending["A"])
+        self.assertEqual(waiter1["message"], waiter2["message"])
+        self.assertEqual(waiter1["message"]["id"], 1)
+        self.assertEqual(waiter1["message"]["epoch"], 7)
+        self.assertEqual(hub.last_messages["A"]["id"], 1)
+
+    def test_notify_role_keeps_pending_when_no_waiters(self) -> None:
+        hub = load_hub_module()
+        hub.waiters["A"] = []
+        hub.pending["A"] = None
+
+        hub.notify_role("A", 3, {"outcome": "blocked"})
+
+        self.assertEqual(hub.pending["A"]["epoch"], 3)
+        self.assertEqual(hub.pending["A"]["payload"]["outcome"], "blocked")
+
+    def test_wait_since_replays_last_message_without_consuming(self) -> None:
+        hub = load_hub_module()
+        hub.last_messages["A"] = {"id": 4, "epoch": 9, "payload": {"outcome": "progress"}}
+        hub.pending["A"] = None
+        handler = make_handler(hub, "/wait/A?since=3")
+
+        hub.Handler.do_GET(handler)
+
+        self.assertEqual(
+            handler.responses,
+            [(200, {"id": 4, "epoch": 9, "payload": {"outcome": "progress"}})],
+        )
+        self.assertIsNone(hub.pending["A"])
 
     def test_health_warnings_detect_state_history_drift(self) -> None:
         hub = load_hub_module()
@@ -428,6 +472,25 @@ class HubTests(unittest.TestCase):
         self.assertEqual(body["health"]["history_size"], 2)
         self.assertEqual(body["health"]["lessons_size"], 2)
         self.assertEqual(body["health"]["outcome_counts"]["progress"], 1)
+        self.assertIn("runtime", body)
+        self.assertEqual(body["runtime"]["waiters"], {"A": 0, "B": 0})
+
+    def test_runtime_status_reports_waiters_pending_and_last_wake(self) -> None:
+        hub = load_hub_module()
+        hub.waiters["A"] = [{"event": object(), "message": None}]
+        hub.waiters["B"] = []
+        hub.pending["A"] = None
+        hub.pending["B"] = {"id": 7, "epoch": 3, "payload": {"outcome": "progress"}}
+        hub.last_messages["A"] = {"id": 5, "epoch": 2, "payload": {}}
+        hub.last_messages["B"] = {"id": 7, "epoch": 3, "payload": {}}
+        hub.next_message_id = 8
+
+        status = hub.runtime_status()
+
+        self.assertEqual(status["waiters"], {"A": 1, "B": 0})
+        self.assertEqual(status["pending"], {"A": None, "B": 7})
+        self.assertEqual(status["last_wake_id"], {"A": 5, "B": 7})
+        self.assertEqual(status["next_message_id"], 8)
 
     def test_append_lesson_adds_id_timestamp_and_trims_limit(self) -> None:
         hub = load_hub_module()
@@ -521,6 +584,44 @@ class HubTests(unittest.TestCase):
 
         self.assertEqual(handler.responses, [(400, {"error": "role must be A or B"})])
 
+    def test_signal_defaults_turn_to_target(self) -> None:
+        hub = load_hub_module()
+        hub.persist_state = lambda *a, **k: None
+        hub.append_history = lambda *a, **k: None
+        hub.state.clear()
+        hub.state.update(hub.DEFAULT_STATE)
+        hub.state["turn"] = "A"
+        hub.pending["B"] = None
+        hub.waiters["B"] = []
+        hub.last_messages["B"] = None
+        body = json.dumps({"target": "B", "payload": {"outcome": "progress"}}).encode()
+        handler = make_handler(hub, "/signal", body)
+
+        hub.Handler.do_POST(handler)
+
+        self.assertEqual(handler.responses[0][0], 200)
+        self.assertEqual(hub.state["turn"], "B")
+
+    def test_signal_explicit_turn_overrides_target_default(self) -> None:
+        hub = load_hub_module()
+        hub.persist_state = lambda *a, **k: None
+        hub.append_history = lambda *a, **k: None
+        hub.state.clear()
+        hub.state.update(hub.DEFAULT_STATE)
+        hub.state["turn"] = "A"
+        hub.pending["B"] = None
+        hub.waiters["B"] = []
+        hub.last_messages["B"] = None
+        body = json.dumps(
+            {"target": "B", "turn": "A", "payload": {"outcome": "progress"}}
+        ).encode()
+        handler = make_handler(hub, "/signal", body)
+
+        hub.Handler.do_POST(handler)
+
+        self.assertEqual(handler.responses[0][0], 200)
+        self.assertEqual(hub.state["turn"], "A")
+
     def test_handler_clear_resets_lessons_and_ids(self) -> None:
         hub = load_hub_module()
         hub.remove_persisted_files = lambda: None
@@ -532,8 +633,11 @@ class HubTests(unittest.TestCase):
         hub.lessons[:] = [{"id": 1, "role": "A", "text": "old", "epoch": 1}]
         hub.next_history_id = 2
         hub.next_lesson_id = 2
-        hub.pending["A"] = (3, {"outcome": "progress"})
-        hub.pending["B"] = (3, {"outcome": "blocked"})
+        hub.next_message_id = 3
+        hub.pending["A"] = {"id": 1, "epoch": 3, "payload": {"outcome": "progress"}}
+        hub.pending["B"] = {"id": 2, "epoch": 3, "payload": {"outcome": "blocked"}}
+        hub.last_messages["A"] = dict(hub.pending["A"])
+        hub.last_messages["B"] = dict(hub.pending["B"])
         body = json.dumps({"confirm": True}).encode()
         handler = make_handler(hub, "/clear", body)
 
@@ -544,9 +648,12 @@ class HubTests(unittest.TestCase):
         self.assertEqual(hub.next_lesson_id, 1)
         self.assertEqual(hub.history, [])
         self.assertEqual(hub.next_history_id, 1)
+        self.assertEqual(hub.next_message_id, 1)
         self.assertIsNone(hub.profile)
         self.assertIsNone(hub.pending["A"])
         self.assertIsNone(hub.pending["B"])
+        self.assertIsNone(hub.last_messages["A"])
+        self.assertIsNone(hub.last_messages["B"])
 
 
 if __name__ == "__main__":

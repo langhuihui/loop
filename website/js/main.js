@@ -228,42 +228,44 @@ function buildPrompt(role, profile, hubUrl) {
   const r = profile.roles[role];
   const lang = window.currentLang === 'zh' ? 'zh' : 'en';
   const roleLabel = role === 'A' ? (lang === 'zh' ? '角色 A' : 'role A') : (lang === 'zh' ? '角色 B' : 'role B');
+  const watcherSnippet = `last_wake_id=0
+while true; do
+  resp=$(curl -sf --max-time 3700 "${hubUrl}/wait/${role}?since=\${last_wake_id}" 2>/dev/null || echo "")
+  [ -z "$resp" ] && continue
+  next_wake_id=$(printf '%s' "$resp" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id", 0))' 2>/dev/null || echo 0)
+  if [ "$next_wake_id" -gt "$last_wake_id" ] 2>/dev/null; then last_wake_id="$next_wake_id"; fi
+  echo "${r.wakeSentinel} {\\"hub\\":$resp}"
+done`;
 
   if (lang === 'zh') {
     return `/loop dynamic 你是 coord ${roleLabel}（${r.name}）。协调 Hub：${hubUrl}
 
-第一步：若尚未运行，启动后台 watcher（记录 PID）：
-while true; do
-  resp=$(curl -sf --max-time 3700 "${hubUrl}/wait/${role}" 2>/dev/null || echo "")
-  [ -z "$resp" ] && continue
-  echo "${r.wakeSentinel} {\\"hub\\":$resp}"
-done
+第一步：若尚未运行，启动后台 watcher（记录 PID）。watcher 必须输出到当前 agent 终端 stdout；不要重定向到文件，否则 /loop 看不到唤醒。watcher 使用 wake id 自愈去重，多个 watcher 不会抢走彼此的消息：
+${watcherSnippet}
 
 每轮被唤醒或首次执行时：
 1. 每轮都重新 curl -s ${hubUrl}/snapshot；不要依赖记忆，尤其是上下文压缩后
 2. 若 snapshot.state.stopped=true、recommended_action=stop，或 epoch >= max_epochs → 总结后停止 loop
-3. 按 profile 中 ${roleLabel} 的 goal、responsibilities、forbidden 执行
-4. 完成后先记录结果，再 POST ${hubUrl}/signal 给对端；payload.outcome 必须是 progress、blocked、no-op、done 之一
-5. 若发现可复用的经验/坑点，POST ${hubUrl}/lessons，包含 role、epoch、text
-6. 同一 epoch 只处理一次；不 push 除非用户要求`;
+3. 判断是否轮到你：被 watcher 唤醒即表示轮到你；若为首次启动且未收到唤醒，仅当 state.turn == ${role} 时才执行，否则回到 watcher 等待对端 signal
+4. 按 profile 中 ${roleLabel} 的 goal、responsibilities、forbidden 执行
+5. 完成后先记录结果，再 POST ${hubUrl}/signal 给对端；payload.outcome 必须是 progress、blocked、no-op、done 之一（hub 默认把 turn 设为 target）
+6. 若发现可复用的经验/坑点，POST ${hubUrl}/lessons，包含 role、epoch、text
+7. 同一 epoch 只处理一次；不 push 除非用户要求`;
   }
 
   return `/loop dynamic You are coord ${roleLabel} (${r.name}). Hub: ${hubUrl}
 
-Step 1 — start background watcher if not running (record PID):
-while true; do
-  resp=$(curl -sf --max-time 3700 "${hubUrl}/wait/${role}" 2>/dev/null || echo "")
-  [ -z "$resp" ] && continue
-  echo "${r.wakeSentinel} {\\"hub\\":$resp}"
-done
+Step 1 — start background watcher if not running (record PID). The watcher must print to this agent terminal's stdout; do not redirect it to a file, or /loop will not see the wake. The watcher uses wake ids for self-healing dedupe, so duplicate watchers cannot steal each other's wake:
+${watcherSnippet}
 
 Each wake or first run:
 1. Re-read curl -s ${hubUrl}/snapshot every round; do not rely on memory, especially after context compaction
 2. If snapshot.state.stopped=true, recommended_action=stop, or epoch >= max_epochs → summarize and stop loop
-3. Follow ${roleLabel} goal, responsibilities, forbidden from profile
-4. Record the result before advancing, then POST ${hubUrl}/signal to the other role; payload.outcome must be one of progress, blocked, no-op, done
-5. When you learn a reusable lesson or pitfall, POST ${hubUrl}/lessons with role, epoch, text
-6. Process each epoch once; do not push unless user asks`;
+3. Decide whether it is your turn: being woken means it is your turn; on a first run without a wake, only act when state.turn == ${role}, otherwise return to the watcher and wait for the other role's signal
+4. Follow ${roleLabel} goal, responsibilities, forbidden from profile
+5. Record the result before advancing, then POST ${hubUrl}/signal to the other role; payload.outcome must be one of progress, blocked, no-op, done (the hub defaults turn to the target)
+6. When you learn a reusable lesson or pitfall, POST ${hubUrl}/lessons with role, epoch, text
+7. Process each epoch once; do not push unless user asks`;
 }
 
 function applyTemplate(templateId) {

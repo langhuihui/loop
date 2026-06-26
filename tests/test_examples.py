@@ -350,6 +350,8 @@ class ExamplesTests(unittest.TestCase):
         self.assertIn("GET | `/lessons`", text)
         self.assertIn("POST | `/lessons`", text)
         self.assertIn("`payload.outcome`", text)
+        self.assertIn("`?since=<wake_id>`", text)
+        self.assertIn("stale duplicate watcher can no longer steal", text)
 
     def test_readme_documents_new_helper_scripts(self) -> None:
         text = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -438,6 +440,9 @@ class ExamplesTests(unittest.TestCase):
         text = (ROOT / "website" / "js" / "main.js").read_text(encoding="utf-8")
 
         self.assertIn("/snapshot", text)
+        self.assertIn("?since=\\${last_wake_id}", text)
+        self.assertIn("duplicate watchers cannot steal", text)
+        self.assertIn("do not redirect it to a file", text)
         self.assertIn("payload.outcome must be one of progress, blocked, no-op, done", text)
         self.assertIn("/lessons", text)
         self.assertNotIn("curl -s ${hubUrl}/profile", text)

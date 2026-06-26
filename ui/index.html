@@ -92,6 +92,52 @@
 
     <section class="panel">
       <div class="panel-head">
+        <h2 data-i18n="live.title">Live status</h2>
+        <div class="panel-actions">
+          <label class="autorefresh">
+            <input type="checkbox" id="autoRefreshToggle" checked>
+            <span data-i18n="live.autoRefresh">Auto-refresh</span>
+          </label>
+          <button type="button" class="btn-inline" id="refreshLiveBtn" data-i18n="snapshot.refresh">Refresh snapshot</button>
+        </div>
+      </div>
+
+      <div class="status-summary" id="statusSummary">
+        <span class="summary-chip muted" data-i18n="live.waiting">Waiting for hub…</span>
+      </div>
+
+      <div class="status-board">
+        <div class="status-card" id="statusCardA">
+          <div class="status-card-head">
+            <span class="badge badge-a">A</span>
+            <span id="statusNameA" data-i18n="role.a">Role A</span>
+            <span class="turn-pill" id="turnPillA" data-i18n="live.turn" hidden>turn</span>
+          </div>
+          <ul class="status-metrics">
+            <li><span data-i18n="live.watcher">Watcher</span><span id="watcherA" class="metric-val">—</span></li>
+            <li><span data-i18n="live.pending">Pending wake</span><span id="pendingA" class="metric-val">—</span></li>
+            <li><span data-i18n="live.lastWake">Last wake id</span><span id="lastWakeA" class="metric-val">—</span></li>
+          </ul>
+        </div>
+        <div class="status-card" id="statusCardB">
+          <div class="status-card-head">
+            <span class="badge badge-b">B</span>
+            <span id="statusNameB" data-i18n="role.b">Role B</span>
+            <span class="turn-pill" id="turnPillB" data-i18n="live.turn" hidden>turn</span>
+          </div>
+          <ul class="status-metrics">
+            <li><span data-i18n="live.watcher">Watcher</span><span id="watcherB" class="metric-val">—</span></li>
+            <li><span data-i18n="live.pending">Pending wake</span><span id="pendingB" class="metric-val">—</span></li>
+            <li><span data-i18n="live.lastWake">Last wake id</span><span id="lastWakeB" class="metric-val">—</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="liveHealth" class="health-warnings empty" data-i18n="health.ok">No health warnings.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2 data-i18n="prompts.title">Session prompts</h2>
         <div class="panel-actions">
           <p class="hint" data-i18n="prompts.hint">Start <strong>Session B</strong> first, then <strong>Session A</strong>.</p>
